@@ -108,7 +108,7 @@ getBonusForUser(analysisResult, surveyData) {
     message += `• План на 30 дней\n`;
     message += `• Контроль прогресса\n`;
     message += `• Ответы на все вопросы\n\n`;
-    message += `👩‍⚕️ [Записаться на консультацию](https://t.me/breathing_opros_bot)`;
+    message += `👨‍⚕️ [Записаться на консультацию](https://t.me/breathing_opros_bot)`;
     return message;
   }
 
@@ -118,7 +118,7 @@ getBonusForUser(analysisResult, surveyData) {
       [Markup.button.callback('📥 Получить мой гид', `download_${bonus.id}`)],
       [Markup.button.callback('📞 Хочу больше техник!', 'contact_request')],
       [Markup.button.callback('🎁 Дополнительные материалы', 'more_materials')],
-      [Markup.button.url('💬 Написать Анастасии', 'https://t.me/breathing_opros_bot')]
+      [Markup.button.url('💬 Написать Александру', 'https://t.me/breathing_opros_bot')]
     ]);
   }
 
@@ -266,13 +266,13 @@ getStaticFallbackBonus(analysisResult) {
       `• Повышение энергии\n` +
       `• Детские программы\n` +
       `• Специальные техники\n\n` +
-      `📞 Для подбора индивидуальной программы обратитесь к [Анастасии Поповой](https://t.me/breathing_opros_bot)`;
+      `📞 Для подбора индивидуальной программы обратитесь к [Александру Попову](https://t.me/breathing_opros_bot)`;
 
     await ctx.editMessageText(message, {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
         [Markup.button.callback('📞 Записаться на консультацию', 'contact_request')],
-        [Markup.button.url('💬 Написать Анастасии', 'https://t.me/breathing_opros_bot')],
+        [Markup.button.url('💬 Написать Александру', 'https://t.me/breathing_opros_bot')],
         [Markup.button.callback('🔙 Назад', 'back_to_results')]
       ])
     });
@@ -282,7 +282,7 @@ getStaticFallbackBonus(analysisResult) {
   async showOrderDetails(ctx, programType) {
     const message = `📋 *ДЕТАЛИ ПРОГРАММЫ*\n\n` +
       `🎯 *Тип:* ${programType}\n` +
-      `📞 Для получения подробной информации и записи обратитесь к [Анастасии Поповой](https://t.me/breathing_opros_bot)\n\n` +
+      `📞 Для получения подробной информации и записи обратитесь к [Александру Попову](https://t.me/breathing_opros_bot)\n\n` +
       `💝 *Что входит в консультацию:*\n` +
       `• Диагностика вашего дыхания\n` +
       `• Подбор индивидуальных техник\n` +
@@ -292,7 +292,7 @@ getStaticFallbackBonus(analysisResult) {
     await ctx.editMessageText(message, {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.url('📞 Записаться к Анастасии', 'https://t.me/breathing_opros_bot')],
+        [Markup.button.url('📞 Записаться к Александру', 'https://t.me/breathing_opros_bot')],
         [Markup.button.callback('🔙 К программам', 'other_programs')]
       ])
     });
@@ -302,7 +302,7 @@ getStaticFallbackBonus(analysisResult) {
   async showProgramHelper(ctx) {
     const message = `🤔 *ПОМОЩЬ В ВЫБОРЕ ПРОГРАММЫ*\n\n` +
       `Не знаете, какая программа вам подойдет?\n\n` +
-      `📞 [Анастасия Попова](https://t.me/breathing_opros_bot) поможет:\n` +
+      `📞 [Александр Попов](https://t.me/breathing_opros_bot) поможет:\n` +
       `• Определить ваши приоритеты\n` +
       `• Подобрать оптимальную программу\n` +
       `• Составить индивидуальный план\n` +

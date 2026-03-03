@@ -283,7 +283,7 @@ class FileHandler {
         text: `🚨 *Для вашей ситуации:*\n` +
               `Судя по анализу, вам нужна срочная помощь. ` +
               `Рекомендуем *персональную консультацию* - ` +
-              `Анастасия подберет техники экстренной помощи.\n\n`,
+              `Александр подберет техники экстренной помощи.\n\n`,
         cta: `🔥 *Действуйте сейчас!* Запишитесь на консультацию сегодня - ` +
              `чем раньше начнете, тем быстрее почувствуете облегчение.`,
         priority: 'consultation'
@@ -370,14 +370,14 @@ class FileHandler {
       `проверенные программы с профессиональной поддержкой!\n\n` +
 
       `❓ *Сомневаетесь в выборе?*\n` +
-      `Напишите [Анастасии Поповой](https://t.me/NastuPopova) - ` +
-      `она даст персональную рекомендацию исходя из вашей ситуации!`;
+      `Напишите [Александру Попову](https://t.me/NastuPopova) - ` +
+      `он даст персональную рекомендацию исходя из вашей ситуации!`;
 
     const keyboard = [
       [{ text: '🛒 Заказать Стартовый комплект', callback_data: 'order_starter' }],
       [{ text: '👨‍⚕️ Записаться на консультацию', callback_data: 'order_individual' }],
       [{ text: '📋 Показать все программы', callback_data: 'show_all_programs' }],
-      [{ text: '💬 Написать Анастасии', url: 'https://t.me/NastuPopova' }],
+      [{ text: '💬 Написать Александру', url: 'https://t.me/NastuPopova' }],
       [{ text: '🔙 Назад к материалам', callback_data: 'more_materials' }]
     ];
 
@@ -393,15 +393,15 @@ class FileHandler {
       const message = `🚨 *ТЕХНИЧЕСКАЯ ПРОБЛЕМА*\n\n` +
         `Не удается загрузить систему персональных рекомендаций.\n\n` +
         `💬 **Что делать:**\n` +
-        `Напишите [Анастасии Поповой](https://t.me/NastuPopova) - ` +
-        `она лично поможет выбрать подходящую программу и ответит ` +
+        `Напишите [Александру Попову](https://t.me/NastuPopova) - ` +
+        `он лично поможет выбрать подходящую программу и ответит ` +
         `на все вопросы о дыхательных практиках!\n\n` +
         `📞 *Быстрые варианты:*\n` +
         `🛒 Стартовый комплект - для самостоятельного изучения\n` +
         `👨‍⚕️ Консультация - для индивидуального подхода`;
 
       const keyboard = [
-        [{ text: '💬 Написать Анастасии', url: 'https://t.me/NastuPopova' }],
+        [{ text: '💬 Написать Александру', url: 'https://t.me/NastuPopova' }],
         [{ text: '🛒 Стартовый комплект', callback_data: 'order_starter' }],
         [{ text: '👨‍⚕️ Консультация', callback_data: 'order_individual' }]
       ];
@@ -432,21 +432,21 @@ class FileHandler {
         [{ text: '🚨 Записаться на срочную консультацию', callback_data: 'order_individual' }],
         [{ text: '🛒 Все же хочу стартовый комплект', callback_data: 'order_starter' }],
         [{ text: '📋 Показать все программы', callback_data: 'show_all_programs' }],
-        [{ text: '💬 Написать Анастасии', url: 'https://t.me/NastuPopova' }],
+        [{ text: '💬 Написать Александру', url: 'https://t.me/NastuPopova' }],
         [{ text: '🔙 Назад к материалам', callback_data: 'more_materials' }]
       ],
       'both': [
         [{ text: '🛒 Заказать Стартовый комплект', callback_data: 'order_starter' }],
         [{ text: '👨‍⚕️ Записаться на консультацию', callback_data: 'order_individual' }],
         [{ text: '📋 Показать все программы', callback_data: 'show_all_programs' }],
-        [{ text: '💬 Написать Анастасии', url: 'https://t.me/NastuPopova' }],
+        [{ text: '💬 Написать Александру', url: 'https://t.me/NastuPopova' }],
         [{ text: '🔙 Назад к материалам', callback_data: 'more_materials' }]
       ],
       'starter': [
         [{ text: '🛒 Начать со Стартового комплекта', callback_data: 'order_starter' }],
         [{ text: '👨‍⚕️ Консультация (если нужен персональный подход)', callback_data: 'order_individual' }],
         [{ text: '📋 Показать все программы', callback_data: 'show_all_programs' }],
-        [{ text: '💬 Написать Анастасии', url: 'https://t.me/NastuPopova' }],
+        [{ text: '💬 Написать Александру', url: 'https://t.me/NastuPopova' }],
         [{ text: '🔙 Назад к материалам', callback_data: 'more_materials' }]
       ]
     };
@@ -731,7 +731,7 @@ class FileHandler {
 
     // Сообщение об ошибке ТОЛЬКО если PDF НЕ был отправлен
     if (!pdfSent) {
-      await ctx.reply('Не удалось отправить гид. Напишите @NastuPopova — она пришлёт материалы лично');
+      await ctx.reply('Не удалось отправить гид. Напишите @NastuPopova — он пришлёт материалы лично');
     }
   }
 }
@@ -751,7 +751,7 @@ class FileHandler {
       ? `• 📄 PDF "Дыхательные игры для детей"\n`
       : `• 📄 PDF "Антистресс дыхание"\n`;
     
-    message += `\n📞 *Записаться:* [Анастасия Попова](https://t.me/breathing_opros_bot)`;
+    message += `\n📞 *Записаться:* [Александр Попов](https://t.me/breathing_opros_bot)`;
 
     const keyboard = [
       [Markup.button.url('📖 Все программы и отзывы', 'https://t.me/breathing_opros_bot')],
@@ -792,7 +792,7 @@ class FileHandler {
       `💰 *Стоимость:* от 3000 ₽\n\n` +
 
       `❓ *Не знаете что выбрать?*\n` +
-      `Напишите [Анастасии](https://t.me/NastuPopova) - она поможет подобрать оптимальный вариант!`;
+      `Напишите [Александру](https://t.me/NastuPopova) - он поможет подобрать оптимальный вариант!`;
 
     const keyboard = [
       [Markup.button.callback('🛒 Заказать Стартовый комплект', 'order_starter')],
@@ -816,7 +816,7 @@ class FileHandler {
       `• 📊 Урок по замеру контрольной паузы\n` +
       `• 🎧 Аудиозапись для медитативного дыхания (15 минут)\n\n` +
       `💰 *Стоимость:* 990 ₽ (вместо 2600 ₽)\n\n` +
-      `📞 *Для заказа:* напишите [Анастасии Поповой](https://t.me/breathing_opros_bot)\n` +
+      `📞 *Для заказа:* напишите [Александру Попову](https://t.me/breathing_opros_bot)\n` +
       `💬 Укажите "Хочу стартовый комплект"`;
 
     const keyboard = [
@@ -837,7 +837,7 @@ class FileHandler {
       `• 🎓 Обучение эффективным техникам\n` +
       `• 💬 Поддержка и контроль результатов\n\n` +
       `💰 *Стоимость:* от 3000 ₽\n\n` +
-      `📞 *Для записи:* напишите [Анастасии Поповой](https://t.me/breathing_opros_bot)\n` +
+      `📞 *Для записи:* напишите [Александру Попову](https://t.me/breathing_opros_bot)\n` +
       `💬 Укажите "Хочу индивидуальную консультацию"`;
 
     const keyboard = [
@@ -866,7 +866,7 @@ class FileHandler {
   async sendAdditionalPDF(ctx, pdfType) {
     const material = this.additionalMaterials[pdfType];
     if (!material) {
-      await ctx.reply('😔 Материал не найден. Обратитесь к [Анастасии](https://t.me/NastuPopova)', {
+      await ctx.reply('😔 Материал не найден. Обратитесь к [Александру](https://t.me/NastuPopova)', {
         parse_mode: 'Markdown'
       });
       return;
@@ -879,12 +879,12 @@ class FileHandler {
       await ctx.replyWithDocument(
         { url: material.url, filename: material.fileName },
         {
-          caption: `🎁 *${material.title}*\n\n${material.description}\n\n📞 Больше материалов у [Анастасии Поповой](https://t.me/NastuPopova)`,
+          caption: `🎁 *${material.title}*\n\n${material.description}\n\n📞 Больше материалов у [Александра Попова](https://t.me/NastuPopova)`,
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
             [Markup.button.url('👨‍⚕️ Записаться на консультацию', 'https://t.me/breathing_opros_bot')],
             [Markup.button.callback('🎁 Другие материалы', 'more_materials')],
-            [Markup.button.url('💬 Написать Анастасии', 'https://t.me/NastuPopova')],
+            [Markup.button.url('💬 Написать Александру', 'https://t.me/NastuPopova')],
             [Markup.button.callback('🗑️ Удалить это меню', 'delete_menu')]
           ])
         }
@@ -908,13 +908,13 @@ class FileHandler {
         `1️⃣ Нажмите кнопку "Открыть PDF" ниже\n` +
         `2️⃣ В открывшемся окне нажмите кнопку скачивания (⬇️)\n` +
         `3️⃣ Файл сохранится в ваши загрузки\n\n` +
-        `💡 Если возникнут проблемы, напишите [Анастасии](https://t.me/NastuPopova) - она отправит файл лично`;
+        `💡 Если возникнут проблемы, напишите [Александру](https://t.me/NastuPopova) - он отправит файл лично`;
 
       const keyboard = [
         [Markup.button.url('📥 Открыть PDF', material.directUrl)],
         [Markup.button.url('👨‍⚕️ Записаться на консультацию', 'https://t.me/breathing_opros_bot')],
         [Markup.button.callback('🎁 Другие материалы', 'more_materials')],
-        [Markup.button.url('💬 Написать Анастасии', 'https://t.me/NastuPopova')],
+        [Markup.button.url('💬 Написать Александру', 'https://t.me/NastuPopova')],
         [Markup.button.callback('🗑️ Удалить это меню', 'delete_menu')]
       ];
 
@@ -928,11 +928,11 @@ class FileHandler {
     } catch (error) {
       console.error('❌ Ошибка отправки fallback PDF:', error);
       await ctx.reply(
-        `😔 Временные технические проблемы с отправкой материалов.\n\n📞 Напишите [Анастасии Поповой](https://t.me/NastuPopova) - она отправит все файлы лично!`,
+        `😔 Временные технические проблемы с отправкой материалов.\n\n📞 Напишите [Александру Попову](https://t.me/NastuPopova) - он отправит все файлы лично!`,
         {
           parse_mode: 'Markdown',
           ...Markup.inlineKeyboard([
-            [Markup.button.url('💬 Написать Анастасии', 'https://t.me/NastuPopova')]
+            [Markup.button.url('💬 Написать Александру', 'https://t.me/NastuPopova')]
           ])
         }
       );
@@ -942,7 +942,7 @@ async showPostPDFMenu(ctx) {
   const message = `✅ *Ваш персональный гид отправлен!*\n\n` +
     `🎯 *Что дальше?*\n` +
     `• Изучите технику и начните практиковать уже сегодня\n` +
-    `• При вопросах — пишите Анастасии лично\n\n` +
+    `• При вопросах — пишите Александру лично\n\n` +
     `Понравился гид? Поделитесь с друзьями — дыхание меняет жизнь! 🌿`;
 
   const keyboard = [
@@ -951,9 +951,6 @@ async showPostPDFMenu(ctx) {
 
     // Мягкий переход в канал (дополнительная ценность)
     [Markup.button.url('🌿 Полезные статьи и практики в канале', 'https://t.me/spokoinoe_dyhanie')],
-
-    // Опционально: если хотите оставить одну ненавязчивую ссылку на консультацию — можно добавить третьей
-    // [Markup.button.url('👩‍⚕️ Записаться на консультацию', 'https://t.me/NastuPopova')],
   ];
 
   await ctx.reply(message, {
@@ -972,7 +969,7 @@ async showPostPDFMenu(ctx) {
     } catch (deleteError) {
       try {
         await ctx.editMessageText(
-          `✅ *Меню закрыто*\n\n💬 Вопросы? Пишите [Анастасии Поповой](https://t.me/NastuPopova)`,
+          `✅ *Меню закрыто*\n\n💬 Вопросы? Пишите [Александру Попову](https://t.me/NastuPopova)`,
           {
             parse_mode: 'Markdown',
             reply_markup: { inline_keyboard: [] }
@@ -980,7 +977,7 @@ async showPostPDFMenu(ctx) {
         );
       } catch (editError) {
         await ctx.reply(
-          `✅ *Меню закрыто*\n\n💬 Вопросы? Пишите [Анастасии Поповой](https://t.me/NastuPopova)`,
+          `✅ *Меню закрыто*\n\n💬 Вопросы? Пишите [Александру Попову](https://t.me/NastuPopova)`,
           { parse_mode: 'Markdown' }
         );
       }
@@ -997,12 +994,12 @@ async showPostPDFMenu(ctx) {
     });
     message += `\n⏱️ *Время:* ${technique.duration}\n`;
     message += `✨ *Результат:* ${technique.result}\n\n`;
-    message += `💬 Напишите [Анастасии Поповой](https://t.me/NastuPopova) за полным гидом!`;
+    message += `💬 Напишите [Александру Попову](https://t.me/NastuPopova) за полным гидом!`;
 
     return ctx.reply(message, {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.url('💬 Написать Анастасии', 'https://t.me/NastuPopova')],
+        [Markup.button.url('💬 Написать Александру', 'https://t.me/NastuPopova')],
         [Markup.button.callback('🗑️ Удалить меню', 'delete_menu')]
       ])
     });
