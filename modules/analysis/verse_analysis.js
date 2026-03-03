@@ -1,5 +1,20 @@
+// === КОНФИГУРАЦИЯ ЭКСПЕРТА ===
+const EXPERT_CONFIG = {
+  name: 'Анастасия Попова',
+  telegramBot: 'https://t.me/breathing_opros_bot',
+  role: {
+    adult: 'Эксперт по дыхательным практикам',
+    child: 'Детский специалист по дыханию'
+  }
+};
+
 class BreathingVERSEAnalysis {
   constructor() {
+    // Сохраняем конфигурацию эксперта в экземпляре
+    this.expertName = EXPERT_CONFIG.name;
+    this.expertBot = EXPERT_CONFIG.telegramBot;
+    this.expertRole = EXPERT_CONFIG.role;
+
     this.segmentWeights = {
       urgency: 0.4,    // 40% - насколько срочно нужна помощь
       readiness: 0.35, // 35% - готовность к практикам  
@@ -281,7 +296,7 @@ class BreathingVERSEAnalysis {
       message += `Регулярные занятия дадут результат уже через неделю.\n\n`;
     }
 
-    message += `💬 Анастасия подготовит для вас персональный план и свяжется в течение 24 часов.`;
+    message += `💬 ${this.expertName} подготовит для вас персональный план и свяжется в течение 24 часов.`;
 
     return message;
   }
@@ -1699,7 +1714,7 @@ generatePersonalMessage(answers, analysisResult) {
 • Игровые техники под конкретные ситуации
 • Поддержку и рекомендации
 
-Анастасия ждёт вас — просто нажмите кнопку ниже.`;
+${this.expertName} ждёт вас — просто нажмите кнопку ниже.`;
   } else {
     return `Ваша персональная техника готова!
 
@@ -1740,7 +1755,7 @@ ${urgencyText}практики падает напряжение, нормали
 • Подбор техник под все ваши цели
 • Поддержку и контроль прогресса
 
-Анастасия ждёт вас — просто нажмите кнопку ниже.`;
+${this.expertName} ждёт вас — просто нажмите кнопку ниже.`;
   }
 }
   }
