@@ -1,10 +1,21 @@
-// Файл: modules/bonus/content-generator.js - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// Файл: modules/bonus/content-generator.js - ПАРАМЕТРИЗОВАННАЯ ВЕРСИЯ
 const fs = require('fs');
+
+// === КОНФИГУРАЦИЯ ЭКСПЕРТА ===
+const EXPERT_CONFIG = {
+  name: 'Анастасия Попова',
+  avatarUrl: 'https://raw.githubusercontent.com/NastuPopova/breathing-lead-bot/main/assets/images/avatar_anastasia.jpg',
+  role: {
+    adult: 'Эксперт по дыхательным практикам',
+    child: 'Детский специалист'
+  }
+};
 
 class ContentGenerator {
   constructor() {
     // URL аватарки
-    this.avatarUrl = 'https://raw.githubusercontent.com/NastuPopova/breathing-lead-bot/main/assets/images/avatar_anastasia.jpg';
+    this.avatarUrl = EXPERT_CONFIG.avatarUrl;
+    this.expertName = EXPERT_CONFIG.name;
 
     // === ВЗРОСЛЫЕ ТЕХНИКИ ===
     this.masterTechniques = {
@@ -524,6 +535,9 @@ class ContentGenerator {
 
       const headerColor = isChildFlow ? '#ff6b6b' : 'white';
       const accentColor = isChildFlow ? '#4ecdc4' : '#1e90ff';
+      
+      // Получаем роль эксперта из конфигурации
+      const expertRole = isChildFlow ? EXPERT_CONFIG.role.child : EXPERT_CONFIG.role.adult;
 
       let htmlContent = `
 <!DOCTYPE html>
@@ -645,13 +659,13 @@ class ContentGenerator {
 <body>
   <div class="header-with-avatar">
     <img src="${this.avatarUrl}" 
-         alt="Анастасия Попова" 
+         alt="${this.expertName}" 
          class="avatar"
          onerror="this.style.display='none'">
     <div class="header-text">
       <h1>${cleanText(title)}</h1>
       <div class="subtitle">${cleanText(subtitle)}</div>
-      <div class="author">${isChildFlow ? '👩‍⚕️ Детский специалист' : '👩‍⚕️ Персональная программа'} от Анастасии Поповой</div>
+      <div class="author">👩‍⚕️ ${expertRole} от ${this.expertName}</div>
     </div>
   </div>
   
@@ -692,7 +706,7 @@ class ContentGenerator {
     <p>${isChildFlow ? 
       'На консультации научим ребенка дышать правильно, быть спокойным и уверенным в себе.' : 
       'На персональной консультации подберем полную программу под вашу ситуацию.'}</p>
-    <p><strong>👩‍⚕️ <a href="https://t.me/breathing_opros_bot">Анастасия Попова</a></strong><br>${isChildFlow ? 'Помогаю детям и родителям' : 'Эксперт по дыхательным практикам'}</p>
+    <p><strong>👩‍⚕️ <a href="https://t.me/breathing_opros_bot">${this.expertName}</a></strong><br>${expertRole}</p>
     <p><a href="https://t.me/breathing_opros_bot">💬 Записаться на консультацию</a></p>
     <p><a href="https://t.me/breathing_opros_bot">📞 Задать вопрос</a></p>
     <p>💝 ${isChildFlow ? 
@@ -716,15 +730,14 @@ class ContentGenerator {
       fs.writeFileSync(filePath, htmlContent, 'utf8');
       console.log(`✅ ${isChildFlow ? 'Детский' : 'Взрослый'} HTML создан: ${filePath}`);
       return filePath;
-       } catch (error) {
+    } catch (error) {
       // НИКОГДА НЕ ВЫВОДИМ ОГРОМНЫЙ HTML В ЛОГИ!
       console.error('❌ Ошибка генерации PDF:', {
         message: error.message,
         userId,
         type: analysisResult?.analysisType || 'unknown',
         issue: analysisResult?.primaryIssue || 'unknown',
-        technique: bonus?.technique?.name || 'undefined',
-        isChild: isChildFlow
+        isChild: analysisResult?.analysisType === 'child'
       });
       throw error; // fallback сработает в fileHandler
     }
@@ -732,11 +745,3 @@ class ContentGenerator {
 }
 
 module.exports = ContentGenerator;
-
-
-
-
-
-
-
-                                                                            
