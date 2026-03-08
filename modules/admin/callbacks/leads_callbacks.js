@@ -104,9 +104,13 @@ class LeadsCallbacks {
         const score = lead.analysisResult?.scores?.total || 0;
         const timeAgo = this.getTimeAgo(lead.timestamp);
         
-        message += `${index + 1}. *${user?.first_name || 'Неизвестно'}*\n`;
-        if (user?.username) {
-          message += `   💬 @${user.username}\n`;
+        // Экранируем имя
+        const firstName = this.escapeMarkdown(user?.first_name || 'Неизвестно');
+        const username = user?.username ? this.escapeMarkdown(user.username) : null;
+        
+        message += `${index + 1}. *${firstName}*\n`;
+        if (username) {
+          message += `   💬 @${username}\n`;
         }
         message += `   🆔 ID: \`${user?.telegram_id}\`\n`;
         message += `   📊 Балл: ${score}/100\n`;
@@ -214,10 +218,14 @@ class LeadsCallbacks {
             hour: '2-digit',
             minute: '2-digit'
           });
-          const name = user?.first_name || 'Неизвестно';
+          
+          // Экранируем имя и username
+          const name = this.escapeMarkdown(user?.first_name || 'Неизвестно');
+          const username = user?.username ? this.escapeMarkdown(user.username) : null;
+          
           message += `   • ${name}`;
-          if (user?.username) {
-            message += ` (@${user.username})`;
+          if (username) {
+            message += ` (@${username})`;
           }
           message += ` - ${time}\n`;
         });
@@ -333,9 +341,12 @@ class LeadsCallbacks {
     
     hotLeads.slice(0, 5).forEach((lead, index) => {
       const user = lead.userInfo;
-      message += `${index + 1}. ${user?.first_name || 'Неизвестно'} - `;
-      if (user?.username) {
-        message += `@${user.username}\n`;
+      const name = this.escapeMarkdown(user?.first_name || 'Неизвестно');
+      const username = user?.username ? this.escapeMarkdown(user.username) : null;
+      
+      message += `${index + 1}. ${name} - `;
+      if (username) {
+        message += `@${username}\n`;
       } else {
         message += `ID: ${user?.telegram_id}\n`;
       }
@@ -357,6 +368,15 @@ class LeadsCallbacks {
   }
 
   // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
+
+  /**
+   * Экранирование специальных символов Markdown
+   */
+  escapeMarkdown(text) {
+    if (!text) return '';
+    // Экранируем символы, которые имеют особое значение в Markdown
+    return text.toString().replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+  }
 
   /**
    * Получение времени "X назад"
