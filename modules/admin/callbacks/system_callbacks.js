@@ -2,18 +2,21 @@
 // Обработчики системных callback'ов (диагностика, настройки, экспорт)
 
 const config = require('../../../config');
+const CSVExporter = require('../export/csv_exporter');
 
 class SystemCallbacks {
   constructor(adminHandlers, adminNotifications) {
     this.adminHandlers = adminHandlers;
     this.adminNotifications = adminNotifications;
+    this.csvExporter = new CSVExporter();
     
     // Статистика системных операций
     this.systemCallbacksUsage = {
       totalRequests: 0,
       operationsUsed: {},
       lastRequest: null,
-      diagnosticsRuns: 0
+      diagnosticsRuns: 0,
+      exportsGenerated: 0
     };
   }
 
@@ -37,6 +40,18 @@ class SystemCallbacks {
           await this.showExport(ctx);
           break;
           
+        case 'admin_export_csv_all':
+          await this.exportCSV(ctx, 'all');
+          break;
+          
+        case 'admin_export_csv_hot':
+          await this.exportCSV(ctx, 'hot');
+          break;
+          
+        case 'admin_export_csv_today':
+          await this.exportCSV(ctx, 'today');
+          break;
+          
         case 'admin_settings':
           await this.showSettings(ctx);
           break;
@@ -48,6 +63,60 @@ class SystemCallbacks {
     } catch (error) {
       console.error('❌ Ошибка SystemCallbacks:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Экспорт лидов в CSV
+   */
+  async exportCSV(ctx, filter = 'all') {
+    console.log(`💾 Экспорт лидов в CSV: ${filter}`);
+    
+    try {
+      // Получаем данные лидов
+      const leadsData = this.adminNotifications?.leadDataStorage || {};
+      const leadsArray = Object.values(leadsData);
+
+      if (leadsArray.length === 0) {
+        await ctx.answerCbQuery('⚠️ Нет лидов для экспорта', { show_alert: true });
+        return;
+      }
+
+      // Генерируем CSV
+      const csvContent = this.csvExporter.generateCSV(leadsArray, { filter });
+      const fileName = this.csvExporter.generateFileName(filter);
+      const stats = this.csvExporter.getExportStats(leadsArray, filter);
+
+      // Отвечаем на callback
+      await ctx.answerCbQuery(`✅ Генерируется файл с ${stats.total} лидами...`);
+
+      // Создаем Buffer из CSV строки
+      const buffer = Buffer.from(csvContent, 'utf-8');
+
+      // Формируем сообщение
+      let caption = `💾 *Экспорт лидов*\n\n`;
+      caption += `✅ Экспортировано: ${stats.total} лидов\n`;
+      caption += `🔥 Горячих: ${stats.hot}\n`;
+      caption += `⭐ Теплых: ${stats.warm}\n`;
+      caption += `❄️ Холодных: ${stats.cold}\n\n`;
+      caption += `📅 Дата: ${new Date().toLocaleString('ru-RU')}\n`;
+      caption += `📊 Фильтр: ${this.getFilterName(filter)}`;
+
+      // Отправляем файл
+      await ctx.replyWithDocument(
+        { source: buffer, filename: fileName },
+        {
+          caption: caption,
+          parse_mode: 'Markdown'
+        }
+      );
+
+      this.systemCallbacksUsage.exportsGenerated++;
+      console.log(`✅ CSV экспорт завершен: ${fileName} (${stats.total} лидов)`);
+
+    } catch (error) {
+      console.error('❌ Ошибка экспорта CSV:', error);
+      await ctx.answerCbQuery('❌ Ошибка экспорта', { show_alert: true });
     }
   }
 
@@ -149,26 +218,38 @@ class SystemCallbacks {
    * Показ меню экспорта
    */
   async showExport(ctx) {
-    console.log('📤 Показ меню экспорта');
+    console.log('💾 Показ меню экспорта');
     
-    let message = `📤 *ЭКСПОРТ ДАННЫХ*\n\n`;
+    const leadsData = this.adminNotifications?.leadDataStorage || {};
+    const totalLeads = Object.keys(leadsData).length;
+    const hotLeads = Object.values(leadsData).filter(l => l.analysisResult?.segment === 'HOT_LEAD').length;
+    
+    const today = new Date().toDateString();
+    const todayLeads = Object.values(leadsData).filter(lead => {
+      if (!lead.timestamp) return false;
+      return new Date(lead.timestamp).toDateString() === today;
+    }).length;
+
+    let message = `💾 *ЭКСПОРТ ДАННЫХ*\n\n`;
     message += `Выберите что экспортировать:\n\n`;
-    message += `📋 **Лиды:**\n`;
-    message += `• Все лиды\n`;
-    message += `• Только горячие лиды\n`;
-    message += `• Лиды за сегодня\n\n`;
-    message += `📊 **Статистика:**\n`;
-    message += `• Общая статистика\n`;
-    message += `• Аналитика по сегментам\n\n`;
-    message += `⚠️ *Функции экспорта находятся в разработке*`;
+    message += `📋 **Лиды в CSV формате:**\n`;
+    message += `• Все лиды (${totalLeads})\n`;
+    message += `• Только горячие (${hotLeads})\n`;
+    message += `• Лиды за сегодня (${todayLeads})\n\n`;
+    message += `📄 *Формат файла:* CSV (Excel)\n`;
+    message += `🇷🇺 *Язык:* Русский\n`;
+    message += `📊 *Колонок:* 20 (все данные лидов)`;
 
     await ctx.editMessageText(message, {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '📋 Лиды (скоро)', callback_data: 'admin_export_leads' },
-            { text: '📊 Статистика (скоро)', callback_data: 'admin_export_stats' }
+            { text: `📋 Все лиды (${totalLeads})`, callback_data: 'admin_export_csv_all' }
+          ],
+          [
+            { text: `🔥 Горячие (${hotLeads})`, callback_data: 'admin_export_csv_hot' },
+            { text: `📅 Сегодня (${todayLeads})`, callback_data: 'admin_export_csv_today' }
           ],
           [{ text: '🎛️ Главная панель', callback_data: 'admin_main' }]
         ]
@@ -220,7 +301,7 @@ class SystemCallbacks {
       // Проверка интеграции
       results.checks.admin_integration = {
         status: 'OK',
-        message: 'Интеграция v3.0 активна'
+        message: 'Интеграция v5.1 активна'
       };
 
       // Проверка модулей
@@ -233,6 +314,12 @@ class SystemCallbacks {
       results.checks.notification_system = {
         status: (this.adminNotifications && this.adminNotifications.templates) ? 'OK' : 'ERROR',
         message: `Модульные уведомления: ${!!this.adminNotifications}, Components: ${!!this.adminNotifications?.templates}`
+      };
+
+      // Проверка CSV экспортера
+      results.checks.csv_exporter = {
+        status: this.csvExporter ? 'OK' : 'ERROR',
+        message: `CSV экспортер: ${!!this.csvExporter}, Экспортов: ${this.systemCallbacksUsage.exportsGenerated}`
       };
 
       // Проверка данных
@@ -291,7 +378,8 @@ class SystemCallbacks {
         'telegram_bot': { status: 'HEALTHY' },
         'admin_callbacks': { status: 'HEALTHY' },
         'lead_storage': { status: 'HEALTHY' },
-        'pdf_generator': { status: 'HEALTHY' }
+        'pdf_generator': { status: 'HEALTHY' },
+        'csv_exporter': { status: 'HEALTHY' }
       },
       performance: {
         memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
@@ -306,6 +394,18 @@ class SystemCallbacks {
   }
 
   // ===== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =====
+
+  /**
+   * Получение названия фильтра
+   */
+  getFilterName(filter) {
+    const names = {
+      'all': 'Все лиды',
+      'hot': 'Горячие лиды',
+      'today': 'Лиды за сегодня'
+    };
+    return names[filter] || filter;
+  }
 
   /**
    * Форматирование времени работы
@@ -368,6 +468,7 @@ class SystemCallbacks {
       operations_used: this.systemCallbacksUsage.operationsUsed,
       last_request: this.systemCallbacksUsage.lastRequest,
       diagnostics_runs: this.systemCallbacksUsage.diagnosticsRuns,
+      exports_generated: this.systemCallbacksUsage.exportsGenerated,
       most_used_operation: this.getMostUsedOperation(),
       last_updated: new Date().toISOString()
     };
