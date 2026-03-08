@@ -23,7 +23,7 @@ const AdminNotificationSystem = require('../modules/admin/notifications/notifica
 
 class BreathingLeadBot {
   constructor() {
-    console.log('🤖 Инициализация BreathingLeadBot v2.7 с расширенной админ-панелью...');
+    console.log('🤖 Инициализация BreathingLeadBot v2.8 с расширенной админ-панелью...');
     
     // Создаем экземпляр Telegraf
     this.bot = new Telegraf(config.LEAD_BOT_TOKEN);
@@ -57,10 +57,6 @@ class BreathingLeadBot {
       this.verseAnalysis = new BreathingVERSEAnalysis();
       console.log('✅ BreathingVERSEAnalysis загружен');
       
-      // Модуль передачи лидов
-      this.leadTransfer = new LeadTransferSystem();
-      console.log('✅ LeadTransferSystem загружен');
-      
       // PDF модули — ИСПРАВЛЕННЫЙ ПОРЯДОК
       this.contentGenerator = new ContentGenerator();
       console.log('✅ ContentGenerator загружен');
@@ -77,9 +73,13 @@ class BreathingLeadBot {
       
       console.log('✅ PDFManager полностью инициализирован и подключён');
       
-      // Модуль админ-уведомлений
+      // ИСПРАВЛЕНО: Модуль админ-уведомлений создаём ПЕРЕД leadTransfer
       this.adminNotifications = new AdminNotificationSystem(this);
       console.log('✅ AdminNotificationSystem загружен');
+      
+      // ИСПРАВЛЕНО: Передаём adminNotifications в LeadTransferSystem
+      this.leadTransfer = new LeadTransferSystem(this.adminNotifications);
+      console.log('✅ LeadTransferSystem загружен с подключением к adminNotifications');
       
       console.log('✅ Все модули системы загружены успешно');
     } catch (error) {
@@ -225,7 +225,7 @@ this.telegramBot.on('callback_query', async (ctx) => {
   getBotInfo() {
     const baseInfo = {
       name: 'BreathingLeadBot',
-      version: '2.7.0',
+      version: '2.8.0',
       status: 'running',
       uptime: process.uptime(),
       configuration: {
@@ -244,6 +244,11 @@ this.telegramBot.on('callback_query', async (ctx) => {
         file_handler: !!this.fileHandler,
         admin_notifications: !!this.adminNotifications,
         admin_integration: !!this.adminIntegration
+      },
+      lead_storage: {
+        leads_count: this.adminNotifications?.leadDataStorage ? 
+          Object.keys(this.adminNotifications.leadDataStorage).length : 0,
+        connected_to_transfer: !!this.leadTransfer?.adminNotifications
       },
       last_updated: new Date().toISOString()
     };
@@ -291,6 +296,7 @@ this.telegramBot.on('callback_query', async (ctx) => {
       modules_loaded: Object.keys(this).filter(k => this[k] !== null).length,
       admin_panel: this.adminIntegration ? 'active' : 'inactive',
       pdf_system: !!this.pdfManager && !!this.pdfManager.contentGenerator && !!this.pdfManager.fileHandler,
+      lead_storage_connected: !!this.leadTransfer?.adminNotifications,
       timestamp: new Date().toISOString()
     };
 
