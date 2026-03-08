@@ -140,12 +140,39 @@ class LeadsCallbacks {
     try {
       const today = new Date().toDateString();
       const leadsData = this.getLeadDataStorage();
-      const leads = Object.values(leadsData)
+      
+      // 🔍 ОТЛАДКА: Выводим структуру данных
+      console.log('🔍 DEBUG: leadDataStorage keys:', Object.keys(leadsData));
+      console.log('🔍 DEBUG: leadDataStorage entries:', Object.entries(leadsData).map(([id, lead]) => ({
+        id,
+        hasTimestamp: !!lead.timestamp,
+        timestamp: lead.timestamp,
+        hasAnalysisResult: !!lead.analysisResult,
+        segment: lead.analysisResult?.segment,
+        hasUserInfo: !!lead.userInfo
+      })));
+      
+      const leads = Object.entries(leadsData)
+        .map(([userId, lead]) => {
+          // Если lead не содержит userInfo, добавляем userId
+          if (!lead.userInfo && userId) {
+            lead.userInfo = { telegram_id: userId };
+          }
+          return lead;
+        })
         .filter(lead => {
-          const leadDate = lead.timestamp ? new Date(lead.timestamp).toDateString() : null;
-          return leadDate === today;
+          if (!lead.timestamp) {
+            console.warn('⚠️ Лид без timestamp:', lead.userInfo?.telegram_id);
+            return false;
+          }
+          const leadDate = new Date(lead.timestamp).toDateString();
+          const isToday = leadDate === today;
+          console.log(`🔍 Проверка лида ${lead.userInfo?.telegram_id}: ${leadDate} === ${today} = ${isToday}`);
+          return isToday;
         })
         .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+      console.log(`📊 Найдено лидов за сегодня: ${leads.length}`);
 
       if (!leads.length) {
         await ctx.editMessageText('📋 *ЛИДЫ СЕГОДНЯ*\n\n✅ Сегодня лидов пока нет.\n\nКогда пользователи завершат анкету, здесь появится список всех лидов за сегодня.', {
@@ -219,6 +246,7 @@ class LeadsCallbacks {
 
     } catch (error) {
       console.error('❌ Ошибка показа лидов за сегодня:', error);
+      console.error('Stack:', error.stack);
       await this.showErrorMessage(ctx, 'Ошибка получения лидов за сегодня');
     }
   }
