@@ -112,7 +112,7 @@ class NotificationTemplates {
 
     // Служебные кнопки
     buttons.push([
-      Markup.button.callback('📊 Полная анкета', `admin_full_survey_${userTelegramId}`),
+      Markup.button.callback('📋 Полная анкета', `admin_full_survey_${userTelegramId}`),
       Markup.button.callback('🏷️ Изменить сегмент', `admin_change_segment_${userTelegramId}`)
     ]);
 
@@ -313,21 +313,43 @@ class NotificationTemplates {
         }
       });
     } else {
-      // Взрослая анкета - полная информация
+      // Взрослая анкета - полная информация (ВСЕ поля)
       const adultFields = [
-        'age_group', 'occupation', 'physical_activity', 'stress_level',
-        'sleep_quality', 'current_problems', 'priority_problem',
-        'breathing_experience', 'time_commitment', 'main_goals'
+        'age_group',
+        'occupation', 
+        'physical_activity',
+        'breathing_pattern',
+        'breathing_problems_frequency',
+        'breathing_when_stressed',
+        'stress_level',
+        'sleep_quality',
+        'current_problems',
+        'priority_problem',
+        'chronic_conditions',
+        'regular_medications',
+        'panic_attacks',
+        'breathing_experience',
+        'time_commitment',
+        'learning_formats',
+        'main_goals'
       ];
       
       adultFields.forEach(field => {
-        if (surveyAnswers[field]) {
+        if (surveyAnswers[field] !== undefined && surveyAnswers[field] !== null) {
           const label = this.getFieldLabel(field);
-          const value = Array.isArray(surveyAnswers[field]) ? 
-            this.formatters.translateArray(surveyAnswers[field]) :
-            (typeof surveyAnswers[field] === 'number' ? 
-              `${surveyAnswers[field]}/10` : 
-              this.formatters.translateValue(surveyAnswers[field]));
+          let value;
+          
+          // Особая обработка разных типов
+          if (Array.isArray(surveyAnswers[field])) {
+            value = this.formatters.translateArray(surveyAnswers[field]);
+          } else if (typeof surveyAnswers[field] === 'number') {
+            value = `${surveyAnswers[field]}/10`;
+          } else if (typeof surveyAnswers[field] === 'boolean') {
+            value = surveyAnswers[field] ? 'Да' : 'Нет';
+          } else {
+            value = this.formatters.translateValue(surveyAnswers[field]);
+          }
+          
           formatted += `• ${label}: ${value}\n`;
         }
       });
@@ -351,16 +373,23 @@ class NotificationTemplates {
       'child_time_availability': 'Время занятий',
       
       // Взрослые поля
-      'age_group': 'Возраст',
-      'occupation': 'Деятельность',
-      'physical_activity': 'Физ.активность',
-      'stress_level': 'Уровень стресса',
-      'sleep_quality': 'Качество сна',
-      'current_problems': 'Текущие проблемы',
-      'priority_problem': 'Приоритетная проблема',
-      'breathing_experience': 'Опыт с практиками',
-      'time_commitment': 'Время на практики',
-      'main_goals': 'Основные цели'
+      'age_group': '🎲 Возраст',
+      'occupation': '💼 Деятельность',
+      'physical_activity': '🏋️ Физ. активность',
+      'breathing_pattern': '👃 Как обычно дышите',
+      'breathing_problems_frequency': '🫁 Как часто проблемы с дыханием',
+      'breathing_when_stressed': '😰 Дыхание при стрессе',
+      'stress_level': '😓 Уровень стресса',
+      'sleep_quality': '🛌 Качество сна',
+      'current_problems': '⚠️ Текущие проблемы',
+      'priority_problem': '🎯 Приоритетная проблема',
+      'chronic_conditions': '🏥 Хронические заболевания',
+      'regular_medications': '💊 Принимаете медикаменты',
+      'panic_attacks': '😰 Панические атаки',
+      'breathing_experience': '🧘 Опыт с практиками',
+      'time_commitment': '⏰ Время на практики',
+      'learning_formats': '📱 Удобные форматы изучения',
+      'main_goals': '🎯 Основные цели'
     };
 
     return labels[field] || field;
@@ -372,13 +401,14 @@ class NotificationTemplates {
   getInfo() {
     return {
       name: 'NotificationTemplates',
-      version: '1.0.0',
+      version: '2.0.0',
       features: [
         'lead_notifications',
         'survey_results',
         'urgent_notifications',
         'daily_summaries',
-        'admin_keyboards'
+        'admin_keyboards',
+        'complete_survey_data'
       ],
       supported_segments: Object.keys(this.segmentEmojis),
       last_updated: new Date().toISOString()
