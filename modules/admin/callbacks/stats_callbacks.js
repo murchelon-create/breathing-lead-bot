@@ -12,6 +12,12 @@ class StatsCallbacks {
       callbacksUsed: {},
       lastRequest: null
     };
+
+    // Инициализируем leadDataStorage если его нет
+    if (this.adminNotifications && !this.adminNotifications.leadDataStorage) {
+      console.warn('⚠️ Инициализация leadDataStorage в stats_callbacks');
+      this.adminNotifications.leadDataStorage = {};
+    }
   }
 
   /**
@@ -45,13 +51,31 @@ class StatsCallbacks {
   }
 
   /**
+   * Получение leadDataStorage с проверкой
+   */
+  getLeadDataStorage() {
+    if (!this.adminNotifications) {
+      console.error('❌ adminNotifications не инициализирован');
+      return {};
+    }
+    if (!this.adminNotifications.leadDataStorage) {
+      console.warn('⚠️ leadDataStorage не существует, создаем пустой объект');
+      this.adminNotifications.leadDataStorage = {};
+    }
+    return this.adminNotifications.leadDataStorage;
+  }
+
+  /**
    * Показ общей статистики
    */
   async showStats(ctx) {
     console.log('📊 Показ статистики');
     
     try {
-      const stats = this.adminNotifications?.getStats?.() || this.getDefaultStats();
+      // Получаем статистику с проверкой
+      const stats = this.getStatsData();
+      const leadsData = this.getLeadDataStorage();
+      const leadsCount = Object.keys(leadsData).length;
       
       let message = `📊 *ДЕТАЛЬНАЯ СТАТИСТИКА*\n\n`;
       
@@ -61,7 +85,8 @@ class StatsCallbacks {
       message += `• 🔥 Горячие: ${stats.daily_stats?.hotLeads || 0}\n`;
       message += `• ⭐ Теплые: ${stats.daily_stats?.warmLeads || 0}\n`;
       message += `• ❄️ Холодные: ${stats.daily_stats?.coldLeads || 0}\n`;
-      message += `• 🌱 Для взращивания: ${stats.daily_stats?.nurtureLeads || 0}\n\n`;
+      message += `• 🌱 Для взращивания: ${stats.daily_stats?.nurtureLeads || 0}\n`;
+      message += `• 📚 Всего в базе: ${leadsCount}\n\n`;
       
       // Конверсия
       const totalLeads = stats.daily_stats?.totalLeads || 0;
@@ -95,46 +120,77 @@ class StatsCallbacks {
   }
 
   /**
+   * Получение данных статистики с проверкой
+   */
+  getStatsData() {
+    const leadsData = this.getLeadDataStorage();
+    const today = new Date().toDateString();
+    
+    const todayLeads = Object.values(leadsData).filter(lead => {
+      if (!lead.timestamp) return false;
+      const leadDate = new Date(lead.timestamp).toDateString();
+      return leadDate === today;
+    });
+
+    const stats = {
+      daily_stats: {
+        totalLeads: todayLeads.length,
+        hotLeads: todayLeads.filter(lead => lead.analysisResult?.segment === 'HOT_LEAD').length,
+        warmLeads: todayLeads.filter(lead => lead.analysisResult?.segment === 'WARM_LEAD').length,
+        coldLeads: todayLeads.filter(lead => lead.analysisResult?.segment === 'COLD_LEAD').length,
+        nurtureLeads: todayLeads.filter(lead => lead.analysisResult?.segment === 'NURTURE_LEAD').length
+      }
+    };
+
+    return stats;
+  }
+
+  /**
    * Показ аналитики
    */
   async showAnalytics(ctx) {
     console.log('📈 Показ аналитики');
     
     try {
-      const leadsData = this.adminNotifications.leadDataStorage || {};
+      const leadsData = this.getLeadDataStorage();
       const analysis = this.analyzeLeadsData(leadsData);
 
       let message = `📈 *АНАЛИТИКА ЛИДОВ*\n\n`;
       
-      // Топ проблемы
-      message += `🎯 *ТОП-5 ПРОБЛЕМ:*\n`;
-      if (analysis.topIssues.length > 0) {
-        analysis.topIssues.forEach((issue, index) => {
-          message += `${index + 1}. ${this.translateIssue(issue.key)}: ${issue.count}\n`;
-        });
+      if (analysis.totalLeads === 0) {
+        message += `📊 Пока нет данных для аналитики\n\n`;
+        message += `После прохождения анкет пользователями здесь появится детальная аналитика.`;
       } else {
-        message += `Нет данных о проблемах\n`;
-      }
-      message += `\n`;
-      
-      // Возрастные группы
-      message += `👥 *ВОЗРАСТНЫЕ ГРУППЫ:*\n`;
-      if (Object.keys(analysis.ageGroups).length > 0) {
-        Object.entries(analysis.ageGroups).forEach(([age, count]) => {
-          const percentage = ((count / analysis.totalLeads) * 100).toFixed(1);
-          message += `• ${this.translateAge(age)}: ${count} (${percentage}%)\n`;
-        });
-      } else {
-        message += `Нет данных о возрастных группах\n`;
-      }
-      message += `\n`;
-      
-      // Основные показатели
-      message += `📊 *ОСНОВНЫЕ ПОКАЗАТЕЛИ:*\n`;
-      message += `• Всего лидов: ${analysis.totalLeads}\n`;
-      message += `• Средний балл: ${analysis.averageScore.toFixed(1)}\n`;
-      if (analysis.topIssues.length > 0) {
-        message += `• Главная проблема: ${this.translateIssue(analysis.topIssues[0]?.key)}\n`;
+        // Топ проблемы
+        message += `🎯 *ТОП-5 ПРОБЛЕМ:*\n`;
+        if (analysis.topIssues.length > 0) {
+          analysis.topIssues.forEach((issue, index) => {
+            message += `${index + 1}. ${this.translateIssue(issue.key)}: ${issue.count}\n`;
+          });
+        } else {
+          message += `Нет данных о проблемах\n`;
+        }
+        message += `\n`;
+        
+        // Возрастные группы
+        message += `👥 *ВОЗРАСТНЫЕ ГРУППЫ:*\n`;
+        if (Object.keys(analysis.ageGroups).length > 0) {
+          Object.entries(analysis.ageGroups).forEach(([age, count]) => {
+            const percentage = ((count / analysis.totalLeads) * 100).toFixed(1);
+            message += `• ${this.translateAge(age)}: ${count} (${percentage}%)\n`;
+          });
+        } else {
+          message += `Нет данных о возрастных группах\n`;
+        }
+        message += `\n`;
+        
+        // Основные показатели
+        message += `📊 *ОСНОВНЫЕ ПОКАЗАТЕЛИ:*\n`;
+        message += `• Всего лидов: ${analysis.totalLeads}\n`;
+        message += `• Средний балл: ${analysis.averageScore.toFixed(1)}\n`;
+        if (analysis.topIssues.length > 0) {
+          message += `• Главная проблема: ${this.translateIssue(analysis.topIssues[0]?.key)}\n`;
+        }
       }
 
       await ctx.editMessageText(message, {
@@ -161,17 +217,18 @@ class StatsCallbacks {
     
     try {
       const today = new Date().toDateString();
-      const todayLeads = Object.values(this.adminNotifications.leadDataStorage || {})
-        .filter(lead => {
-          const leadDate = lead.timestamp ? new Date(lead.timestamp).toDateString() : null;
-          return leadDate === today;
-        });
+      const leadsData = this.getLeadDataStorage();
+      const todayLeads = Object.values(leadsData).filter(lead => {
+        const leadDate = lead.timestamp ? new Date(lead.timestamp).toDateString() : null;
+        return leadDate === today;
+      });
 
       let message = `📊 *АНАЛИТИКА ЗА СЕГОДНЯ*\n\n`;
       message += `📅 ${new Date().toLocaleDateString('ru-RU')}\n\n`;
       
       if (!todayLeads.length) {
-        message += `📋 Сегодня лидов пока нет`;
+        message += `📋 Сегодня лидов пока нет\n\n`;
+        message += `После того как пользователи завершат анкету, здесь появится статистика.`;
       } else {
         // Статистика по сегментам
         const segmentStats = todayLeads.reduce((acc, lead) => {
@@ -180,7 +237,7 @@ class StatsCallbacks {
           return acc;
         }, {});
 
-        message += `👥 **Лиды по сегментам:**\n`;
+        message += `👥 *Лиды по сегментам:*\n`;
         Object.entries(segmentStats).forEach(([segment, count]) => {
           const emoji = this.getSegmentEmoji(segment);
           const percentage = ((count / todayLeads.length) * 100).toFixed(1);
@@ -195,7 +252,7 @@ class StatsCallbacks {
         const avgScore = scores.length > 0 ? 
           (scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1) : 0;
 
-        message += `\n📈 **Показатели:**\n`;
+        message += `\n📈 *Показатели:*\n`;
         message += `• Всего лидов: ${todayLeads.length}\n`;
         message += `• Средний балл: ${avgScore}/100\n`;
         message += `• Конверсия в горячие: ${segmentStats.HOT_LEAD ? 
@@ -233,6 +290,7 @@ class StatsCallbacks {
     if (!leads.length) return analysis;
 
     let totalScore = 0;
+    let scoreCount = 0;
     const issueCount = {};
 
     leads.forEach(lead => {
@@ -252,6 +310,7 @@ class StatsCallbacks {
       const score = lead.analysisResult?.scores?.total;
       if (typeof score === 'number') {
         totalScore += score;
+        scoreCount++;
       }
     });
 
@@ -261,13 +320,14 @@ class StatsCallbacks {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    analysis.averageScore = leads.length > 0 ? totalScore / leads.length : 0;
+    analysis.averageScore = scoreCount > 0 ? totalScore / scoreCount : 0;
 
     return analysis;
   }
 
   getAverageScore() {
-    const leads = Object.values(this.adminNotifications.leadDataStorage || {});
+    const leadsData = this.getLeadDataStorage();
+    const leads = Object.values(leadsData);
     if (!leads.length) return 0;
     
     const scores = leads
@@ -333,21 +393,9 @@ class StatsCallbacks {
     return Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
   }
 
-  getDefaultStats() {
-    return {
-      daily_stats: { 
-        totalLeads: 0, 
-        hotLeads: 0, 
-        warmLeads: 0, 
-        coldLeads: 0, 
-        nurtureLeads: 0 
-      }
-    };
-  }
-
   async showErrorMessage(ctx, errorText) {
     try {
-      await ctx.editMessageText(`❌ ${errorText}`, {
+      await ctx.editMessageText(`❌ ${errorText}\n\nПопробуйте обновить данные или вернуться на главную панель.`, {
         reply_markup: {
           inline_keyboard: [
             [{ text: '🔄 Попробовать снова', callback_data: 'admin_stats' }],
