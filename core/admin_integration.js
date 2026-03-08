@@ -1,9 +1,8 @@
-// Файл: core/admin_integration.js - ОБНОВЛЕННАЯ ВЕРСИЯ v5.0
+// Файл: core/admin_integration.js - ОБНОВЛЕННАЯ ВЕРСИЯ v5.1
 // Координирует работу всех модульных админ-компонентов с поддержкой уведомлений
 
 const AdminHandlers = require('../modules/admin/admin_handlers');
 const AdminCallbacks = require('../modules/admin/admin_callbacks');
-const AdminNotificationSystem = require('../modules/admin/notifications/notification_system');
 const config = require('../config');
 
 class AdminIntegration {
@@ -12,8 +11,8 @@ class AdminIntegration {
     this.telegramBot = botInstance.bot;
     this.adminId = config.ADMIN_ID;
     
-    // Инициализируем модульную систему уведомлений
-    this.adminNotifications = new AdminNotificationSystem(this.bot);
+    // ИСПРАВЛЕНО: Используем adminNotifications из botInstance вместо создания нового
+    this.adminNotifications = botInstance.adminNotifications;
     
     // Получаем ссылки на существующие модули
     this.verseAnalysis = botInstance.verseAnalysis;
@@ -31,22 +30,29 @@ class AdminIntegration {
       totalAdminActions: 0,
       lastAction: null,
       errors: 0,
-      moduleVersion: '5.0.0',
-      architecture: 'modular_v3_with_notifications'
+      moduleVersion: '5.1.0',
+      architecture: 'modular_v3_with_notifications_fixed'
     };
   }
 
   // ===== ИНИЦИАЛИЗАЦИЯ =====
 
   initialize() {
-    console.log('🎛️ Инициализация модульной админ-панели v5.0 с уведомлениями...');
+    console.log('🎛️ Инициализация модульной админ-панели v5.1 с уведомлениями...');
     
     try {
+      // Проверяем что adminNotifications существует
+      if (!this.adminNotifications) {
+        throw new Error('adminNotifications не передан из botInstance');
+      }
+      
       // Проверяем leadDataStorage
       if (!this.adminNotifications.leadDataStorage) {
         this.adminNotifications.leadDataStorage = {};
         console.log('⚠️ Инициализировано пустое leadDataStorage');
       }
+      
+      console.log('✅ Используем adminNotifications из botInstance (shared instance)');
       
       // Создаем модульные админ-компоненты
       this.createModularAdminComponents();
@@ -58,20 +64,20 @@ class AdminIntegration {
       this.startAdminScheduler();
       
       this.integrationStats.initialized = true;
-      console.log('✅ Модульная админ-панель v5.0 готова к работе');
+      console.log('✅ Модульная админ-панель v5.1 готова к работе');
       
       // Выводим информацию о модулях
       this.logModularArchitectureInfo();
       
     } catch (error) {
-      console.error('❌ Ошибка инициализации админ-панели v5.0:', error);
+      console.error('❌ Ошибка инициализации админ-панели v5.1:', error);
       this.integrationStats.errors++;
-      this.sendEmergencyAlert('system_error', 'Ошибка инициализации админ-панели v5.0', { error: error.message });
+      this.sendEmergencyAlert('system_error', 'Ошибка инициализации админ-панели v5.1', { error: error.message });
     }
   }
 
   createModularAdminComponents() {
-    console.log('📦 Создание модульных админ-компонентов v5.0...');
+    console.log('📦 Создание модульных админ-компонентов v5.1...');
     
     // Создаем модульный AdminHandlers
     this.adminHandlers = new AdminHandlers(
@@ -112,7 +118,7 @@ class AdminIntegration {
   }
 
   logModularArchitectureInfo() {
-    console.log('🏗️ ИНФОРМАЦИЯ О МОДУЛЬНОЙ АРХИТЕКТУРЕ v5.0:');
+    console.log('🏗️ ИНФОРМАЦИЯ О МОДУЛЬНОЙ АРХИТЕКТУРЕ v5.1:');
     console.log('📊 Handlers модули:');
     console.log('   - MainHandler: основные команды + управление уведомлениями');
     console.log('   - StatsHandler: статистика и аналитика');
@@ -124,7 +130,7 @@ class AdminIntegration {
     console.log('   - LeadsCallbacks: лиды');
     console.log('   - SystemCallbacks: система');
     console.log('🔔 Notifications модули:');
-    console.log('   - NotificationSystem: основная система с режимами');
+    console.log('   - NotificationSystem: основная система с режимами (SHARED INSTANCE)');
     console.log('   - NotificationTemplates: шаблоны');
     console.log('   - NotificationHandlers: обработчики');
     console.log('   - NotificationFormatters: форматирование');
@@ -138,7 +144,7 @@ class AdminIntegration {
     // answerCbQuery УЖЕ вызван в bot.action — не вызываем снова!
 
     this.trackAdminAction(callbackData, ctx.from.id);
-    console.log(`🔍 Admin callback integration v5.0: ${callbackData}`);
+    console.log(`🔍 Admin callback integration v5.1: ${callbackData}`);
 
     if (!this.adminCallbacks) {
       console.error('❌ AdminCallbacks не инициализирован');
@@ -148,7 +154,7 @@ class AdminIntegration {
     await this.adminCallbacks.handleCallback(ctx, callbackData);
 
   } catch (error) {
-    console.error('❌ Ошибка handleAdminCallback в интеграции v5.0:', error);
+    console.error('❌ Ошибка handleAdminCallback в интеграции v5.1:', error);
     this.integrationStats.errors++;
     // Уже ответили в bot.action — просто логируем
   }
@@ -170,7 +176,7 @@ class AdminIntegration {
     try {
       this.trackAdminAction(commandName, ctx.from.id);
       
-      console.log(`🔍 Admin command integration v5.0: ${commandName}`);
+      console.log(`🔍 Admin command integration v5.1: ${commandName}`);
       
       // Передаем обработку в модульный AdminHandlers
       if (this.adminHandlers) {
@@ -181,15 +187,15 @@ class AdminIntegration {
       }
       
     } catch (error) {
-      console.error('❌ Ошибка handleAdminCommand в интеграции v5.0:', error);
+      console.error('❌ Ошибка handleAdminCommand в интеграции v5.1:', error);
       this.integrationStats.errors++;
       
       await ctx.reply('Произошла ошибка при выполнении команды');
-      await this.sendEmergencyAlert('admin_error', `Ошибка admin command v5.0: ${error.message}`, {
+      await this.sendEmergencyAlert('admin_error', `Ошибка admin command v5.1: ${error.message}`, {
         command: commandName,
         user_id: ctx.from.id,
         error_stack: error.stack,
-        architecture: 'modular_v3_with_notifications'
+        architecture: 'modular_v3_with_notifications_fixed'
       });
     }
   }
@@ -249,8 +255,8 @@ class AdminIntegration {
     const results = {
       timestamp: new Date().toISOString(),
       overall_status: 'UNKNOWN',
-      version: '5.0.0',
-      architecture: 'modular_v3_with_notifications',
+      version: '5.1.0',
+      architecture: 'modular_v3_with_notifications_fixed',
       checks: {}
     };
 
@@ -258,7 +264,7 @@ class AdminIntegration {
       // Проверка интеграции
       results.checks.admin_integration = {
         status: this.integrationStats.initialized ? 'OK' : 'ERROR',
-        message: `Интеграция v5.0 ${this.integrationStats.initialized ? 'активна' : 'не инициализирована'}`
+        message: `Интеграция v5.1 ${this.integrationStats.initialized ? 'активна' : 'не инициализирована'}`
       };
 
       // Проверка модульных компонентов
@@ -275,7 +281,7 @@ class AdminIntegration {
       // Проверка системы уведомлений
       results.checks.notification_system = {
         status: (this.adminNotifications && this.adminNotifications.templates) ? 'OK' : 'ERROR',
-        message: `Система уведомлений: ${!!this.adminNotifications}, Templates: ${!!this.adminNotifications?.templates}`
+        message: `Система уведомлений (shared): ${!!this.adminNotifications}, Templates: ${!!this.adminNotifications?.templates}`
       };
 
       // Проверка режимов уведомлений
@@ -289,7 +295,7 @@ class AdminIntegration {
       const leadsCount = Object.keys(this.adminNotifications.leadDataStorage || {}).length;
       results.checks.data_integrity = {
         status: 'OK',
-        message: `Доступ к ${leadsCount} лидам`
+        message: `Доступ к ${leadsCount} лидам (shared storage)`
       };
 
       // Проверка конфигурации
@@ -371,8 +377,8 @@ class AdminIntegration {
       memory_usage: process.memoryUsage(),
       cpu_usage: process.cpuUsage(),
       admin_panel_status: this.integrationStats.initialized ? 'active' : 'inactive',
-      version: '5.0.0',
-      architecture: 'modular_v3_with_notifications',
+      version: '5.1.0',
+      architecture: 'modular_v3_with_notifications_fixed',
       integrations: {
         main_bot: !!config.MAIN_BOT_API_URL,
         crm: !!config.CRM_WEBHOOK_URL,
@@ -402,6 +408,7 @@ class AdminIntegration {
       },
       notifications: {
         loaded: !!this.adminNotifications,
+        shared_instance: true,
         current_mode: this.getNotificationMode(),
         modules: this.adminNotifications ? {
           templates: !!this.adminNotifications.templates,
@@ -443,12 +450,13 @@ class AdminIntegration {
       
       // Информация об архитектуре
       architecture_info: {
-        version: '5.0.0',
-        type: 'modular_v3_with_notifications',
+        version: '5.1.0',
+        type: 'modular_v3_with_notifications_fixed',
         total_modules: this.getModuleCount(),
         handlers_modules: 4,
         callbacks_modules: 4,
-        notifications_modules: 5
+        notifications_modules: 5,
+        shared_notifications_instance: true
       },
       
       timestamp: new Date().toISOString()
@@ -461,26 +469,26 @@ class AdminIntegration {
       action: action,
       user_id: userId,
       timestamp: new Date().toISOString(),
-      architecture: 'modular_v3_with_notifications'
+      architecture: 'modular_v3_with_notifications_fixed'
     };
     
-    console.log(`📊 Admin action tracked v5.0: ${action} by ${userId} (total: ${this.integrationStats.totalAdminActions})`);
+    console.log(`📊 Admin action tracked v5.1: ${action} by ${userId} (total: ${this.integrationStats.totalAdminActions})`);
   }
 
   // ===== ПЛАНИРОВЩИК И АВТОМАТИЗАЦИЯ =====
 
   startAdminScheduler() {
-    console.log('⏰ Запуск планировщика админ-задач v5.0...');
+    console.log('⏰ Запуск планировщика админ-задач v5.1...');
     
     // Ежечасная проверка системы
     setInterval(async () => {
       try {
         const diagnostics = await this.runDiagnostics();
         if (diagnostics.overall_status === 'ERROR') {
-          await this.sendEmergencyAlert('system_error', 'Обнаружены критические ошибки модульной системы v5.0', diagnostics);
+          await this.sendEmergencyAlert('system_error', 'Обнаружены критические ошибки модульной системы v5.1', diagnostics);
         }
       } catch (error) {
-        console.error('❌ Ошибка планировщика диагностики v5.0:', error);
+        console.error('❌ Ошибка планировщика диагностики v5.1:', error);
       }
     }, 3600000); // Каждый час
 
@@ -496,13 +504,13 @@ class AdminIntegration {
     setInterval(async () => {
       try {
         const cleanupResult = await this.cleanupOldData(30);
-        console.log('🧹 Еженедельная очистка v5.0:', cleanupResult);
+        console.log('🧹 Еженедельная очистка v5.1:', cleanupResult);
       } catch (error) {
-        console.error('❌ Ошибка планировщика очистки v5.0:', error);
+        console.error('❌ Ошибка планировщика очистки v5.1:', error);
       }
     }, 7 * 24 * 3600000); // Каждую неделю
 
-    console.log('✅ Планировщик админ-задач v5.0 запущен');
+    console.log('✅ Планировщик админ-задач v5.1 запущен');
   }
 
   // ===== ЭКСТРЕННЫЕ УВЕДОМЛЕНИЯ =====
@@ -524,8 +532,8 @@ class AdminIntegration {
     const emoji = alertEmojis[alertType] || '⚠️';
     
     try {
-      const alertMessage = `${emoji} *ЭКСТРЕННОЕ УВЕДОМЛЕНИЕ v5.0*\n\n` +
-        `**Архитектура:** Модульная v3 с уведомлениями\n` +
+      const alertMessage = `${emoji} *ЭКСТРЕННОЕ УВЕДОМЛЕНИЕ v5.1*\n\n` +
+        `**Архитектура:** Модульная v3 (fixed shared instance)\n` +
         `**Тип:** ${alertType}\n` +
         `**Сообщение:** ${message}\n\n` +
         `**Детали:**\n\`\`\`\n${JSON.stringify(additionalData, null, 2)}\n\`\`\`\n\n` +
@@ -544,7 +552,7 @@ class AdminIntegration {
       });
 
     } catch (error) {
-      console.error('❌ Ошибка отправки экстренного уведомления v5.0:', error);
+      console.error('❌ Ошибка отправки экстренного уведомления v5.1:', error);
     }
   }
 
@@ -554,8 +562,8 @@ class AdminIntegration {
     try {
       const backup = {
         timestamp: new Date().toISOString(),
-        version: '5.0.0',
-        architecture: 'modular_v3_with_notifications',
+        version: '5.1.0',
+        architecture: 'modular_v3_with_notifications_fixed',
         leads_data: this.adminNotifications.leadDataStorage || {},
         integration_stats: this.integrationStats,
         
@@ -582,7 +590,7 @@ class AdminIntegration {
           total_leads: Object.keys(this.adminNotifications.leadDataStorage || {}).length,
           total_modules: this.getModuleCount(),
           backup_size: 0,
-          created_by: 'admin_integration_v5.0_modular_notifications'
+          created_by: 'admin_integration_v5.1_fixed_shared_instance'
         }
       };
 
@@ -591,7 +599,7 @@ class AdminIntegration {
 
       return backup;
     } catch (error) {
-      console.error('❌ Ошибка создания резервной копии v5.0:', error);
+      console.error('❌ Ошибка создания резервной копии v5.1:', error);
       throw error;
     }
   }
@@ -602,17 +610,17 @@ class AdminIntegration {
       const cleanupResult = this.adminNotifications.cleanupOldData(daysToKeep);
 
       // Добавляем информацию о модульной архитектуре
-      cleanupResult.architecture = 'modular_v3_with_notifications';
-      cleanupResult.version = '5.0.0';
+      cleanupResult.architecture = 'modular_v3_with_notifications_fixed';
+      cleanupResult.version = '5.1.0';
       cleanupResult.modules_count = this.getModuleCount();
 
-      console.log(`🧹 Очистка данных v5.0 завершена:`, cleanupResult);
+      console.log(`🧹 Очистка данных v5.1 завершена:`, cleanupResult);
 
       return cleanupResult;
 
     } catch (error) {
-      console.error('❌ Ошибка очистки данных v5.0:', error);
-      return { error: error.message, version: '5.0.0' };
+      console.error('❌ Ошибка очистки данных v5.1:', error);
+      return { error: error.message, version: '5.1.0' };
     }
   }
 
@@ -621,14 +629,15 @@ class AdminIntegration {
   getIntegrationInfo() {
     return {
       name: 'AdminIntegration',
-      version: '5.0.0',
-      architecture: 'modular_v3_with_notifications',
+      version: '5.1.0',
+      architecture: 'modular_v3_with_notifications_fixed',
       status: this.integrationStats.initialized ? 'active' : 'inactive',
       features: [
         'modular_architecture_v3',
         'modular_handlers',
         'modular_callbacks',
         'notification_system_v4',
+        'shared_notifications_instance',
         'notification_modes_management',
         'test_notifications',
         'command_routing',
@@ -655,6 +664,7 @@ class AdminIntegration {
         },
         notifications: {
           loaded: !!this.adminNotifications,
+          shared_instance: true,
           count: 5,
           modules: ['system', 'templates', 'handlers', 'formatters', 'analytics'],
           current_mode: this.getNotificationMode()
@@ -671,11 +681,11 @@ class AdminIntegration {
 
   async shutdown() {
     try {
-      console.log('🔄 Завершение работы AdminIntegration v5.0...');
+      console.log('🔄 Завершение работы AdminIntegration v5.1...');
       
       // Создаем резервную копию
       const backup = await this.createBackup();
-      console.log('💾 Резервная копия v5.0 создана');
+      console.log('💾 Резервная копия v5.1 создана');
       
       // Очищаем модульные компоненты
       if (this.adminHandlers) {
@@ -697,8 +707,8 @@ class AdminIntegration {
         
         await this.telegramBot.telegram.sendMessage(
           this.adminId,
-          `🔄 *Завершение работы модульной админ-панели v5.0*\n\n` +
-          `**Архитектура:** Модульная v3 с уведомлениями\n` +
+          `🔄 *Завершение работы модульной админ-панели v5.1*\n\n` +
+          `**Архитектура:** Модульная v3 (fixed shared instance)\n` +
           `Резервная копия создана\n` +
           `Всего лидов: ${backup.metadata.total_leads}\n` +
           `Модулей загружено: ${backup.metadata.total_modules}/13\n` +
@@ -711,10 +721,10 @@ class AdminIntegration {
         );
       }
       
-      console.log('✅ AdminIntegration v5.0 завершил работу');
+      console.log('✅ AdminIntegration v5.1 завершил работу');
       
     } catch (error) {
-      console.error('❌ Ошибка при завершении AdminIntegration v5.0:', error);
+      console.error('❌ Ошибка при завершении AdminIntegration v5.1:', error);
     }
   }
 
@@ -749,8 +759,8 @@ class AdminIntegration {
     
     return {
       ready: this.isReady(),
-      version: '5.0.0',
-      architecture: 'modular_v3_with_notifications',
+      version: '5.1.0',
+      architecture: 'modular_v3_with_notifications_fixed',
       admin_id: this.adminId,
       modules_loaded: {
         handlers: !!this.adminHandlers,
@@ -759,6 +769,7 @@ class AdminIntegration {
         notification_analytics: !!this.adminNotifications?.analytics
       },
       notification_system: {
+        shared_instance: true,
         current_mode: notificationMode,
         modes_available: ['silent', 'filtered', 'test_mode', 'all_notifications'],
         test_mode: this.adminNotifications?.testMode || false,
