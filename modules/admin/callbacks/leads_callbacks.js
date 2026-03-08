@@ -13,6 +13,12 @@ class LeadsCallbacks {
       lastRequest: null,
       processedLeads: new Set()
     };
+
+    // Инициализируем leadDataStorage если его нет
+    if (this.adminNotifications && !this.adminNotifications.leadDataStorage) {
+      console.warn('⚠️ Инициализация leadDataStorage в leads_callbacks');
+      this.adminNotifications.leadDataStorage = {};
+    }
   }
 
   /**
@@ -50,28 +56,40 @@ class LeadsCallbacks {
   }
 
   /**
+   * Получение leadDataStorage с проверкой
+   */
+  getLeadDataStorage() {
+    if (!this.adminNotifications) {
+      console.error('❌ adminNotifications не инициализирован');
+      return {};
+    }
+    if (!this.adminNotifications.leadDataStorage) {
+      console.warn('⚠️ leadDataStorage не существует, создаем пустой объект');
+      this.adminNotifications.leadDataStorage = {};
+    }
+    return this.adminNotifications.leadDataStorage;
+  }
+
+  /**
    * Показ горячих лидов
    */
   async showHotLeads(ctx) {
     console.log('🔥 Показ горячих лидов');
     
     try {
-      if (!this.adminNotifications.leadDataStorage) {
-        console.warn('⚠️ leadDataStorage не инициализировано');
-        this.adminNotifications.leadDataStorage = {};
-      }
-
-      const leads = Object.values(this.adminNotifications.leadDataStorage || {})
+      const leadsData = this.getLeadDataStorage();
+      const leads = Object.values(leadsData)
         .filter(lead => lead.analysisResult?.segment === 'HOT_LEAD')
         .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
         .slice(0, 10);
 
       if (!leads.length) {
-        await ctx.editMessageText('✅ Нет горячих лидов', {
+        await ctx.editMessageText('✅ *ГОРЯЧИЕ ЛИДЫ*\n\nНет горячих лидов.\n\nПосле прохождения анкеты пользователями, здесь появятся горячие лиды с высоким баллом VERSE.', {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
               [{ text: '🔄 Обновить', callback_data: 'admin_hot_leads' }],
+              [{ text: '📋 Все лиды сегодня', callback_data: 'admin_today_leads' }],
               [{ text: '🎛️ Главная панель', callback_data: 'admin_main' }]
             ]
           }
@@ -86,7 +104,10 @@ class LeadsCallbacks {
         const score = lead.analysisResult?.scores?.total || 0;
         const timeAgo = this.getTimeAgo(lead.timestamp);
         
-        message += `${index + 1}. **${user?.first_name || 'Неизвестно'}**\n`;
+        message += `${index + 1}. *${user?.first_name || 'Неизвестно'}*\n`;
+        if (user?.username) {
+          message += `   💬 @${user.username}\n`;
+        }
         message += `   🆔 ID: \`${user?.telegram_id}\`\n`;
         message += `   📊 Балл: ${score}/100\n`;
         message += `   ⏰ ${timeAgo}\n`;
@@ -118,7 +139,8 @@ class LeadsCallbacks {
     
     try {
       const today = new Date().toDateString();
-      const leads = Object.values(this.adminNotifications.leadDataStorage || {})
+      const leadsData = this.getLeadDataStorage();
+      const leads = Object.values(leadsData)
         .filter(lead => {
           const leadDate = lead.timestamp ? new Date(lead.timestamp).toDateString() : null;
           return leadDate === today;
@@ -126,11 +148,12 @@ class LeadsCallbacks {
         .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 
       if (!leads.length) {
-        await ctx.editMessageText('📋 *ЛИДЫ СЕГОДНЯ*\n\n✅ Сегодня лидов пока нет', {
+        await ctx.editMessageText('📋 *ЛИДЫ СЕГОДНЯ*\n\n✅ Сегодня лидов пока нет.\n\nКогда пользователи завершат анкету, здесь появится список всех лидов за сегодня.', {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
               [{ text: '🔄 Обновить', callback_data: 'admin_today_leads' }],
+              [{ text: '📊 Аналитика дня', callback_data: 'admin_day_analytics' }],
               [{ text: '🎛️ Главная панель', callback_data: 'admin_main' }]
             ]
           }
@@ -139,6 +162,7 @@ class LeadsCallbacks {
       }
 
       let message = `📋 *ЛИДЫ СЕГОДНЯ (${leads.length})*\n\n`;
+      message += `📅 ${new Date().toLocaleDateString('ru-RU')}\n\n`;
       
       // Группируем по сегментам
       const bySegment = leads.reduce((acc, lead) => {
@@ -148,9 +172,14 @@ class LeadsCallbacks {
         return acc;
       }, {});
 
-      Object.entries(bySegment).forEach(([segment, segmentLeads]) => {
+      // Сортируем сегменты по приоритету
+      const segmentOrder = ['HOT_LEAD', 'WARM_LEAD', 'COLD_LEAD', 'NURTURE_LEAD', 'UNKNOWN'];
+      const sortedSegments = segmentOrder.filter(seg => bySegment[seg]);
+
+      sortedSegments.forEach(segment => {
+        const segmentLeads = bySegment[segment];
         const emoji = this.getSegmentEmoji(segment);
-        message += `${emoji} **${segment}** (${segmentLeads.length}):\n`;
+        message += `${emoji} *${this.translateSegment(segment)}* (${segmentLeads.length}):\n`;
         
         segmentLeads.slice(0, 3).forEach(lead => {
           const user = lead.userInfo;
@@ -158,7 +187,12 @@ class LeadsCallbacks {
             hour: '2-digit',
             minute: '2-digit'
           });
-          message += `   • ${user?.first_name || 'Неизвестно'} (${time})\n`;
+          const name = user?.first_name || 'Неизвестно';
+          message += `   • ${name}`;
+          if (user?.username) {
+            message += ` (@${user.username})`;
+          }
+          message += ` - ${time}\n`;
         });
         
         if (segmentLeads.length > 3) {
@@ -195,23 +229,25 @@ class LeadsCallbacks {
   async showSearchPanel(ctx) {
     console.log('🔍 Показ панели поиска лидов');
     
+    const leadsData = this.getLeadDataStorage();
+    const totalLeads = Object.keys(leadsData).length;
+
     let message = `🔍 *ПОИСК ЛИДОВ*\n\n`;
     message += `Для поиска лидов используйте команду:\n`;
     message += `\`/search_lead <запрос>\`\n\n`;
-    message += `**Можно искать по:**\n`;
+    message += `*Можно искать по:*\n`;
     message += `• Telegram ID\n`;
     message += `• Имени пользователя\n`;
     message += `• Username (без @)\n`;
     message += `• Проблеме\n`;
     message += `• Сегменту\n\n`;
-    message += `**Примеры:**\n`;
+    message += `*Примеры:*\n`;
     message += `\`/search_lead 123456789\`\n`;
     message += `\`/search_lead Анна\`\n`;
     message += `\`/search_lead стресс\`\n`;
     message += `\`/search_lead HOT_LEAD\`\n\n`;
     
-    const totalLeads = Object.keys(this.adminNotifications.leadDataStorage || {}).length;
-    message += `📊 **Всего лидов в базе:** ${totalLeads}`;
+    message += `📊 *Всего лидов в базе:* ${totalLeads}`;
 
     try {
       await ctx.editMessageText(message, {
@@ -236,7 +272,8 @@ class LeadsCallbacks {
   async processAllHotLeads(ctx) {
     console.log('📞 Обработка всех горячих лидов');
     
-    const hotLeads = Object.values(this.adminNotifications.leadDataStorage || {})
+    const leadsData = this.getLeadDataStorage();
+    const hotLeads = Object.values(leadsData)
       .filter(lead => lead.analysisResult?.segment === 'HOT_LEAD');
 
     if (!hotLeads.length) {
@@ -260,11 +297,11 @@ class LeadsCallbacks {
 
     let message = `📞 *ОБРАБОТКА ГОРЯЧИХ ЛИДОВ*\n\n`;
     message += `🔥 Найдено горячих лидов: ${hotLeads.length}\n\n`;
-    message += `**Рекомендуемые действия:**\n`;
+    message += `*Рекомендуемые действия:*\n`;
     message += `• Связаться с каждым в течение 2 часов\n`;
     message += `• Предложить экстренную консультацию\n`;
     message += `• Отправить персональные материалы\n\n`;
-    message += `**Контакты для связи:**\n`;
+    message += `*Контакты для связи:*\n`;
     
     hotLeads.slice(0, 5).forEach((lead, index) => {
       const user = lead.userInfo;
@@ -328,6 +365,20 @@ class LeadsCallbacks {
   }
 
   /**
+   * Перевод сегмента
+   */
+  translateSegment(segment) {
+    const translations = {
+      'HOT_LEAD': 'Горячие',
+      'WARM_LEAD': 'Теплые',
+      'COLD_LEAD': 'Холодные',
+      'NURTURE_LEAD': 'Для взращивания',
+      'UNKNOWN': 'Неопределенные'
+    };
+    return translations[segment] || segment;
+  }
+
+  /**
    * Перевод проблемы
    */
   translateIssue(issue) {
@@ -349,10 +400,10 @@ class LeadsCallbacks {
    */
   async showErrorMessage(ctx, errorText) {
     try {
-      await ctx.editMessageText(`❌ ${errorText}`, {
+      await ctx.editMessageText(`❌ ${errorText}\n\nПопробуйте обновить данные или вернуться на главную панель.`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🔄 Попробовать снова', callback_data: 'admin_hot_leads' }],
+            [{ text: '🔄 Попробовать снова', callback_data: 'admin_today_leads' }],
             [{ text: '🎛️ Главная панель', callback_data: 'admin_main' }]
           ]
         }
@@ -427,6 +478,3 @@ class LeadsCallbacks {
 }
 
 module.exports = LeadsCallbacks;
-		
-		
-		
