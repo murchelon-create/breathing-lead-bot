@@ -1,11 +1,11 @@
 // Файл: modules/integration/lead_transfer.js
-// ИСПРАВЛЕННАЯ ВЕРСИЯ - работа без основного бота
+// ИСПРАВЛЕННАЯ ВЕРСИЯ - правильное сохранение лидов в adminNotifications
 
 const axios = require('axios');
 const config = require('../../config');
 
 class LeadTransferSystem {
-  constructor() {
+  constructor(adminNotifications = null) {
     this.retryAttempts = 3;
     this.retryDelay = 2000;
     
@@ -16,11 +16,18 @@ class LeadTransferSystem {
     this.enableRetries = true;
     this.enableLogging = config.NODE_ENV !== 'production';
     
+    // ИСПРАВЛЕНО: Сохраняем ссылку на adminNotifications
+    this.adminNotifications = adminNotifications;
+    
     // ИСПРАВЛЕНО: Режим автономной работы
     this.standaloneMode = !this.mainBotWebhook;
     
     if (this.standaloneMode) {
       console.log('🔄 LeadTransferSystem: Режим автономной работы (данные сохраняются локально)');
+    }
+    
+    if (!this.adminNotifications) {
+      console.warn('⚠️ LeadTransferSystem: adminNotifications не передан - данные будут сохраняться только локально');
     }
   }
 
@@ -28,9 +35,12 @@ class LeadTransferSystem {
     console.log('🚀 Начинаем обработку лида:', userData.userInfo?.telegram_id);
 
     try {
+      // ИСПРАВЛЕНО: Всегда сохраняем в adminNotifications первым делом
+      await this.saveToAdminNotifications(userData);
+      
       // ИСПРАВЛЕНО: Проверяем режим работы
       if (this.standaloneMode) {
-        console.log('💾 Автономный режим: сохраняем лид локально');
+        console.log('💾 Автономный режим: лид сохранен локально');
         return await this.saveLeadLocally(userData);
       }
 
@@ -51,8 +61,59 @@ class LeadTransferSystem {
       
       // ИСПРАВЛЕНО: В случае ошибки всегда сохраняем локально
       console.log('💾 Сохраняем лид локально из-за ошибки передачи');
+      await this.saveToAdminNotifications(userData);
       await this.saveLeadLocally(userData);
       await this.logLeadError(userData, error);
+    }
+  }
+
+  /**
+   * НОВЫЙ МЕТОД: Сохранение в adminNotifications.leadDataStorage
+   */
+  async saveToAdminNotifications(userData) {
+    try {
+      if (!this.adminNotifications) {
+        console.warn('⚠️ adminNotifications недоступен, пропускаем сохранение');
+        return;
+      }
+
+      const userId = userData.userInfo?.telegram_id;
+      if (!userId) {
+        console.error('❌ Отсутствует telegram_id в userData');
+        return;
+      }
+
+      // Инициализируем leadDataStorage если не существует
+      if (!this.adminNotifications.leadDataStorage) {
+        console.log('🔧 Инициализация leadDataStorage');
+        this.adminNotifications.leadDataStorage = {};
+      }
+
+      // Сохраняем полные данные лида
+      this.adminNotifications.leadDataStorage[userId] = {
+        userInfo: userData.userInfo,
+        surveyType: userData.surveyType,
+        surveyAnswers: userData.surveyAnswers,
+        analysisResult: userData.analysisResult,
+        timestamp: new Date().toISOString(),
+        saved_via: 'lead_transfer'
+      };
+
+      console.log(`✅ Лид ${userId} сохранен в adminNotifications.leadDataStorage`);
+      
+      // Также обновляем сегмент если есть метод
+      if (this.adminNotifications.updateStoredSegment && userData.analysisResult?.segment) {
+        this.adminNotifications.updateStoredSegment(userId, userData.analysisResult.segment);
+      }
+
+      // Обновляем дневную статистику если есть метод
+      if (this.adminNotifications.updateDailyStats && userData.analysisResult?.segment) {
+        this.adminNotifications.updateDailyStats(userData.analysisResult.segment);
+      }
+
+    } catch (error) {
+      console.error('❌ Ошибка сохранения в adminNotifications:', error);
+      // Не выбрасываем ошибку, чтобы не останавливать процесс
     }
   }
 
@@ -77,7 +138,7 @@ class LeadTransferSystem {
           timeout: 10000,
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'BreathingLeadBot/2.4',
+            'User-Agent': 'BreathingLeadBot/2.5',
             'X-Source': 'lead-bot'
           }
         });
@@ -137,7 +198,7 @@ class LeadTransferSystem {
           timeout: 15000,
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'BreathingLeadBot/2.4',
+            'User-Agent': 'BreathingLeadBot/2.5',
             'X-Source': 'telegram-lead-bot'
           }
         });
@@ -211,7 +272,8 @@ class LeadTransferSystem {
       survey_type: userData.surveyType,
       segment: userData.analysisResult?.segment,
       processing_time: Date.now() - (userData.startTime || Date.now()),
-      mode: this.standaloneMode ? 'standalone' : 'integrated'
+      mode: this.standaloneMode ? 'standalone' : 'integrated',
+      saved_in_admin_panel: !!this.adminNotifications
     };
 
     console.log('✅ УСПЕШНАЯ ОБРАБОТКА ЛИДА:', JSON.stringify(logData, null, 2));
@@ -239,6 +301,7 @@ class LeadTransferSystem {
     const results = {
       main_bot: { status: 'not_configured', url: this.mainBotWebhook },
       crm: { status: 'not_configured', url: this.crmWebhook },
+      admin_notifications: { status: this.adminNotifications ? 'connected' : 'not_configured' },
       standalone_mode: this.standaloneMode,
       timestamp: new Date().toISOString()
     };
@@ -286,14 +349,19 @@ class LeadTransferSystem {
         retries_enabled: this.enableRetries,
         retry_attempts: this.retryAttempts,
         retry_delay: this.retryDelay,
-        standalone_mode: this.standaloneMode // ИСПРАВЛЕНО
+        standalone_mode: this.standaloneMode,
+        admin_notifications_connected: !!this.adminNotifications // НОВОЕ
       },
       endpoints: {
         main_bot: this.mainBotWebhook ? `${this.mainBotWebhook}/api/leads/import` : null,
         crm: this.crmWebhook,
         trainer: this.trainerContact
       },
-      version: '2.4.1', // Увеличиваем версию
+      storage: {
+        leads_in_admin_panel: this.adminNotifications?.leadDataStorage ? 
+          Object.keys(this.adminNotifications.leadDataStorage).length : 0
+      },
+      version: '2.5.0', // Увеличиваем версию
       last_updated: new Date().toISOString()
     };
   }
