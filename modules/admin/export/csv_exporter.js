@@ -4,7 +4,7 @@
 class CSVExporter {
   constructor() {
     this.encoding = 'utf-8';
-    this.delimiter = ',';
+    this.delimiter = ';'; // ✅ ИЗМЕНЕНО: точка с запятой для русского Excel
     this.lineBreak = '\r\n'; // Для корректной работы в Excel
   }
 
@@ -176,10 +176,10 @@ class CSVExporter {
     
     const str = String(field);
     
-    // Если содержит запятую, кавычки или перенос строки - оборачиваем в кавычки
+    // Если содержит разделитель, кавычки или перенос строки - оборачиваем в кавычки
     if (str.includes(this.delimiter) || str.includes('"') || str.includes('\n') || str.includes('\r')) {
       // Экранируем кавычки удвоением
-      return `"${str.replace(/"/g, '""')}"`;
+      return `"${str.replace(/"/g, '""')}`;
     }
     
     return str;
