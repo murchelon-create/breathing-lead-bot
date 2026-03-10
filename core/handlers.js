@@ -301,10 +301,71 @@ class Handlers {
     ];
   }
 
-  // === ОСНОВНЫЕ МЕТОДЫ (ИЗ ОРИГИНАЛА) ===
+  // === ОСНОВНЫЕ МЕТОДЫ ===
+
+  /**
+   * Отправляет уведомление админу о новом пользователе пришедшем с сайта.
+   * Вызывается только если у /start есть payload вида website_*
+   */
+  async notifyAdminWebsiteVisitor(ctx, source) {
+    try {
+      const sourceLabels = {
+        'website_test':      '🧪 Кнопка «Пройти тест бесплатно» (секция диагностики)',
+        'website_hero':      '🏠 Кнопка «Записаться» (главный экран)',
+        'website_hero_test': '📊 Кнопка «Пройти тест» (главный экран)',
+        'website_cta':       '🎯 CTA-кнопка',
+      };
+
+      const sourceLabel = sourceLabels[source] || `🔗 Источник: ${source}`;
+      const user = ctx.from;
+      const userName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+      const userLink = user.username ? `@${user.username}` : `(без username)`;
+      const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+
+      const message =
+        `🌐 *Новый пользователь с сайта!*\n\n` +
+        `👤 Имя: ${userName}\n` +
+        `📬 Telegram: ${userLink}\n` +
+        `🆔 ID: \`${user.id}\`\n` +
+        `📍 Источник: ${sourceLabel}\n` +
+        `🕐 Время: ${time} (МСК)`;
+
+      const adminId = config.ADMIN_ID;
+      if (!adminId) {
+        console.warn('⚠️ ADMIN_ID не задан — уведомление о посетителе пропущено');
+        return;
+      }
+
+      const telegram = this.bot.bot?.telegram || this.telegramBot?.telegram;
+      if (!telegram) {
+        console.warn('⚠️ Telegram API недоступен для уведомления о посетителе');
+        return;
+      }
+
+      await telegram.sendMessage(adminId, message, { parse_mode: 'Markdown' });
+      console.log(`✅ Уведомление о посетителе с сайта отправлено (${source})`);
+
+    } catch (error) {
+      // Не критично — не должно ронять бот
+      console.warn('⚠️ Уведомление о посетителе не отправлено (не критично):', error.message);
+    }
+  }
   
   async handleStart(ctx) {
     console.log(`Команда /start от пользователя ${ctx.from.id}`);
+
+    // Извлекаем payload из /start (например: website_test, website_hero и т.д.)
+    const startPayload = ctx.message?.text?.split(' ')[1] || null;
+
+    if (startPayload && startPayload.startsWith('website')) {
+      console.log(`🌐 Переход с сайта, источник: ${startPayload}`);
+      // Сохраняем источник в сессию (пригодится при передаче лида)
+      if (!ctx.session) ctx.session = {};
+      ctx.session.sourceParam = startPayload;
+      // Уведомляем админа — не ждём, чтобы не задерживать приветствие
+      this.notifyAdminWebsiteVisitor(ctx, startPayload).catch(() => {});
+    }
+
     const message = config.MESSAGES.WELCOME;
 
     await ctx.reply(message, {
@@ -362,7 +423,8 @@ class Handlers {
       completedQuestions: [], 
       startTime: Date.now(),
       multipleChoiceSelections: {},
-      questionStartTime: Date.now()
+      questionStartTime: Date.now(),
+      sourceParam: ctx.session?.sourceParam || null  // сохраняем источник при сбросе сессии
     };
     
     console.log('✅ Сессия создана:', ctx.session);
@@ -753,7 +815,8 @@ class Handlers {
         analysisResult: analysisResult,
         surveyType: analysisResult.analysisType,
         completedAt: new Date().toISOString(),
-        surveyDuration: Date.now() - ctx.session.startTime
+        surveyDuration: Date.now() - ctx.session.startTime,
+        sourceParam: ctx.session.sourceParam || null  // источник с сайта
       };
 
       await this.leadTransfer.processLead(userData);
@@ -820,14 +883,15 @@ class Handlers {
   getStats() {
     return {
       name: 'MainHandlers',
-      version: '7.1.0-FINAL-WITH-TEASER',
+      version: '7.2.0-WEBSITE-NOTIFICATIONS',
       features: [
         'two_step_bonus', 
         'intriguing_teaser', 
         'full_survey_flow', 
         'multiple_choice_with_checks', 
         'back_navigation',
-        'protected_admin_notifications'
+        'protected_admin_notifications',
+        'website_visitor_notifications'
       ],
       last_updated: new Date().toISOString()
     };
