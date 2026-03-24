@@ -3,11 +3,11 @@ const fs = require('fs');
 
 // === КОНФИГУРАЦИЯ ЭКСПЕРТА ===
 const EXPERT_CONFIG = {
-  name: 'Александр Попов',
+  name: 'Александра Попова',
   avatarUrl: 'https://raw.githubusercontent.com/NastuPopova/breathing-lead-bot/main/assets/images/avatar_anastasia.jpg',
   role: {
-    adult: 'Консультант по гимнастике Бутейко',
-    child: 'Консультант по гимнастике Бутейко'
+    adult: 'Гимнастика по Бутейко',
+    child: 'Гимнастика по Бутейко'
   }
 };
 
