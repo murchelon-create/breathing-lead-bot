@@ -665,7 +665,7 @@ class ContentGenerator {
     <div class="header-text">
       <h1>${cleanText(title)}</h1>
       <div class="subtitle">${cleanText(subtitle)}</div>
-      <div class="author">👩‍⚕️ ${expertRole} от ${this.expertName}</div>
+      <div class="author">👨‍⚕️ ${expertRole} от ${this.expertName}</div>
     </div>
   </div>
   
