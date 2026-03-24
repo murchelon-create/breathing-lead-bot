@@ -777,7 +777,7 @@ class Handlers {
     } catch (error) {
       console.error('❌ Ошибка завершения анкеты:', error);
       await ctx.reply(
-        '😔 Произошла ошибка при обработке результатов. Обратитесь к @NastuPopova',
+        '😔 Произошла ошибка при обработке результатов. Обратитесь к @AS_Popov87',
         { parse_mode: 'Markdown' }
       );
     }
@@ -788,14 +788,14 @@ class Handlers {
 
   await ctx.reply(
     '✅ *Диагностика завершена!*\n\n' +
-    'Я тщательно проанализировала ваши ответы и подготовила *персональную дыхательную технику* специально под ваш профиль, возраст и уровень стресса.\n\n' +
+    'Я тщательно проанализировал ваши ответы и подготовил *персональную дыхательную технику* специально под ваш профиль, возраст и уровень стресса.\n\n' +
     'Готовы получить ваш индивидуальный гид в PDF с пошаговой инструкцией, научным обоснованием и планом на 3 дня?',
     {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
         [Markup.button.callback('🎁 Получить персональную технику', 'get_bonus')],
         [Markup.button.url('Записаться на консультацию', 'https://t.me/breathing_opros_bot')],
-        [Markup.button.url('💬 Написать Анастасии', 'https://t.me/NastuPopova')]
+        [Markup.button.url('💬 Написать Александру', 'https://t.me/@AS_Popov87')]
       ])
     }
   );
@@ -854,12 +854,12 @@ class Handlers {
     const message = `🤔 *КАК ВЫБРАТЬ ПРОГРАММУ?*\n\n` +
       `🛒 **Стартовый комплект** — для самостоятельного изучения\n\n` +
       `👨‍⚕️ **Персональная консультация** — индивидуальный подход\n\n` +
-      `💬 Для точной рекомендации напишите @NastuPopova`;
+      `💬 Для точной рекомендации напишите @AS_Popov87`;
 
     await ctx.reply(message, {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.url('💬 Написать Анастасии', 'https://t.me/NastuPopova')]
+        [Markup.button.url('💬 Написать Александру', 'https://t.me/@AS_Popov87')]
       ])
     });
   }
@@ -867,7 +867,7 @@ class Handlers {
   async handleError(ctx, error) {
     console.error('Обработка ошибки:', error);
     try {
-      await ctx.reply('Произошла ошибка. Попробуйте /start или напишите @NastuPopova');
+      await ctx.reply('Произошла ошибка. Попробуйте /start или напишите @AS_Popov87');
     } catch {}
   }
 
