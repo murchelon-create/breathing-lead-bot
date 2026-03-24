@@ -706,7 +706,7 @@ class ContentGenerator {
     <p>${isChildFlow ? 
       'На консультации научим ребенка дышать правильно, быть спокойным и уверенным в себе.' : 
       'На персональной консультации подберем полную программу под вашу ситуацию.'}</p>
-    <p><strong>👩‍⚕️ <a href="https://t.me/breathing_opros_bot">${this.expertName}</a></strong><br>${expertRole}</p>
+    <p><strong>👨‍⚕️ <a href="https://t.me/breathing_opros_bot">${this.expertName}</a></strong><br>${expertRole}</p>
     <p><a href="https://t.me/breathing_opros_bot">💬 Записаться на консультацию</a></p>
     <p><a href="https://t.me/breathing_opros_bot">📞 Задать вопрос</a></p>
     <p>💝 ${isChildFlow ? 
