@@ -16,7 +16,7 @@ const LeadTransferSystem = require('../modules/integration/lead_transfer');
 // ИМПОРТЫ ДЛЯ PDF-БОНУСОВ
 const ContentGenerator = require('../modules/bonus/content-generator');
 const FileHandler = require('../modules/bonus/file-handler');
-const PDFManager = require('../modules/bonus/pdf-manager'); // ← ВАЖНО: Добавлен настоящий PDFManager
+const PDFManager = require('../modules/bonus/pdf-manager');
 
 // ИСПРАВЛЕНО: Правильный импорт AdminNotificationSystem
 const AdminNotificationSystem = require('../modules/admin/notifications/notification_system');
@@ -49,35 +49,26 @@ class BreathingLeadBot {
     try {
       console.log('📦 Загрузка модулей системы...');
       
-      // Модуль анкетирования
       this.surveyQuestions = new ExtendedSurveyQuestions();
       console.log('✅ ExtendedSurveyQuestions загружен');
       
-      // Модуль VERSE-анализа
       this.verseAnalysis = new BreathingVERSEAnalysis();
       console.log('✅ BreathingVERSEAnalysis загружен');
       
-      // PDF модули — ИСПРАВЛЕННЫЙ ПОРЯДОК
       this.contentGenerator = new ContentGenerator();
       console.log('✅ ContentGenerator загружен');
       
       this.fileHandler = new FileHandler(this.contentGenerator);
       console.log('✅ FileHandler загружен');
       
-      // ВАЖНО: Сначала создаём PDFManager
       this.pdfManager = new PDFManager();
-      
-      // Передаём ему зависимости
       this.pdfManager.contentGenerator = this.contentGenerator;
       this.pdfManager.fileHandler = this.fileHandler;
-      
       console.log('✅ PDFManager полностью инициализирован и подключён');
       
-      // ИСПРАВЛЕНО: Модуль админ-уведомлений создаём ПЕРЕД leadTransfer
       this.adminNotifications = new AdminNotificationSystem(this);
       console.log('✅ AdminNotificationSystem загружен');
       
-      // ИСПРАВЛЕНО: Передаём adminNotifications в LeadTransferSystem
       this.leadTransfer = new LeadTransferSystem(this.adminNotifications);
       console.log('✅ LeadTransferSystem загружен с подключением к adminNotifications');
       
@@ -94,11 +85,9 @@ class BreathingLeadBot {
     try {
       console.log('🔧 Инициализация компонентов ядра...');
       
-      // Middleware для обработки сессий и логирования
       this.middleware = new Middleware(this);
       console.log('✅ Middleware инициализирован');
       
-      // Обработчики команд и callback
       this.handlers = new Handlers(this);
       console.log('✅ Handlers инициализированы');
       
@@ -109,15 +98,12 @@ class BreathingLeadBot {
     }
   }
 
-  // НОВОЕ: Инициализация админ-панели
+  // Инициализация админ-панели
   initializeAdminPanel() {
     try {
-      console.log('🎛️ Инициализация расширененной админ-панели...');
+      console.log('🎛️ Инициализация расширенной админ-панели...');
       
-      // Создаем интеграцию админ-панели
       this.adminIntegration = new AdminIntegration(this);
-      
-      // Инициализируем админ-панель
       this.adminIntegration.initialize();
       
       console.log('✅ Расширенная админ-панель готова');
@@ -128,48 +114,35 @@ class BreathingLeadBot {
     }
   }
 
-  // Настройка бота
-  // ✅ НОВЫЙ setupBot с явным catch callback-ов
-setupBot() {
-  try {
-    console.log('⚙️ Настройка бота...');
+  setupBot() {
+    try {
+      console.log('⚙️ Настройка бота...');
 
-    // Middleware
-    this.middleware.setup();
+      this.middleware.setup();
+      this.handlers.setup();
 
-    // Обработчики команд
-    this.handlers.setup();
+      if (this.adminIntegration) {
+        this.adminIntegration.startAdminScheduler();
+      }
 
-    // Админ-панель
-    if (this.adminIntegration) {
-      this.adminIntegration.startAdminScheduler();
+      this.telegramBot.on('callback_query', async (ctx) => {
+        const data = ctx.callbackQuery.data;
+        if (!data || data.startsWith('admin_')) {
+          return;
+        }
+        console.log('📋 Опросниковый callback:', data);
+        await ctx.answerCbQuery();
+      });
+
+      this.setupErrorHandling();
+
+      console.log('✅ Бот полностью настроен и готов к работе');
+    } catch (error) {
+      console.error('❌ Ошибка настройки бота:', error);
+      throw error;
     }
-
-   // === ЛОВИМ ТОЛЬКО ОПРОСНИКОВЫЕ callback-и (не admin_) ===
-this.telegramBot.on('callback_query', async (ctx) => {
-  const data = ctx.callbackQuery.data;
-
-  // Пропускаем admin-callback-и — они обработаются ниже через bot.action
-  if (!data || data.startsWith('admin_')) {
-    return; // ничего не делаем, пусть обрабатывает bot.action
   }
 
-  // Остальные callback-и (опросник) — обрабатываем как раньше
-  console.log('📋 Опросниковый callback:', data);
-  await ctx.answerCbQuery(); // отвечаем сразу
-});
-
-    // Обработка ошибок
-    this.setupErrorHandling();
-
-    console.log('✅ Бот полностью настроен и готов к работе');
-  } catch (error) {
-    console.error('❌ Ошибка настройки бота:', error);
-    throw error;
-  }
-}
-
-  // Обработка ошибок бота
   setupErrorHandling() {
     this.bot.catch((err, ctx) => {
       console.error('💥 Ошибка Telegraf:', err);
@@ -177,32 +150,28 @@ this.telegramBot.on('callback_query', async (ctx) => {
     });
   }
 
-  // Запуск бота
   async launch() {
     this.validateConfiguration();
     await this.bot.launch();
     console.log('🚀 BreathingLeadBot успешно запущен');
   }
 
-  // Остановка бота
   async stop(reason = 'unknown') {
     try {
       console.log(`🛑 Останавливаем бота: ${reason}`);
       await this.bot.stop(reason);
       
-      // Остановка middleware
       if (this.middleware?.stop) {
         this.middleware.stop();
       }
       
       console.log('✅ Бот остановлен');
-      
     } catch (error) {
       console.error('❌ Ошибка при остановке бота:', error);
     }
   }
 
-  // Валидация конфигурации — ИСПРАВЛЕНО: читаем напрямую из process.env
+  // Валидация конфигурации — читаем напрямую из process.env
   // чтобы избежать проблемы кеширования dotenv на bothost
   validateConfiguration() {
     console.log('🔍 Проверка конфигурации...');
@@ -219,9 +188,13 @@ this.telegramBot.on('callback_query', async (ctx) => {
       throw new Error('Отсутствует обязательный параметр: LEAD_BOT_TOKEN');
     }
 
-    // Обновляем config и токен Telegraf на случай если dotenv не успел загрузиться
+    // Обновляем config на случай если dotenv не успел загрузиться
     config.LEAD_BOT_TOKEN = token;
-    this.bot.token = token;
+    // Примечание: this.bot.token readonly в Telegraf, пересоздаём если нужно
+    if (!this.bot.token) {
+      this.bot = new Telegraf(token);
+      this.telegramBot = this.bot;
+    }
 
     if (!config.MAIN_BOT_API_URL) {
       console.log('ℹ️ MAIN_BOT_API_URL не настроен - работаем в автономном режиме');
@@ -234,7 +207,6 @@ this.telegramBot.on('callback_query', async (ctx) => {
     console.log('✅ Конфигурация валидна');
   }
 
-  // Получение информации о боте
   getBotInfo() {
     const baseInfo = {
       name: 'BreathingLeadBot',
@@ -274,7 +246,6 @@ this.telegramBot.on('callback_query', async (ctx) => {
     return baseInfo;
   }
 
-  // Остальные методы (getAdminStats, createBackup и т.д.) оставляем без изменений
   async getAdminStats() {
     if (!this.adminIntegration) return null;
     return this.adminIntegration.getExtendedStats();
@@ -338,7 +309,6 @@ this.telegramBot.on('callback_query', async (ctx) => {
       
       console.log('✅ Настройки обновлены');
       return { success: true };
-      
     } catch (error) {
       console.error('❌ Ошибка обновления настроек:', error);
       return { success: false, error: error.message };
