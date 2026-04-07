@@ -202,22 +202,35 @@ this.telegramBot.on('callback_query', async (ctx) => {
     }
   }
 
-  // Валидация конфигурации
+  // Валидация конфигурации — ИСПРАВЛЕНО: читаем напрямую из process.env
+  // чтобы избежать проблемы кеширования dotenv на bothost
   validateConfiguration() {
     console.log('🔍 Проверка конфигурации...');
-    
-    if (!config.LEAD_BOT_TOKEN) {
+
+    // Bothost передаёт токен под разными именами — берём первый найденный
+    const token = process.env.LEAD_BOT_TOKEN
+      || process.env.BOT_TOKEN
+      || process.env.TOKEN
+      || process.env.API_TOKEN
+      || process.env.TELEGRAM_BOT_TOKEN
+      || process.env.BOT_API_TOKEN;
+
+    if (!token) {
       throw new Error('Отсутствует обязательный параметр: LEAD_BOT_TOKEN');
     }
-    
+
+    // Обновляем config и токен Telegraf на случай если dotenv не успел загрузиться
+    config.LEAD_BOT_TOKEN = token;
+    this.bot.token = token;
+
     if (!config.MAIN_BOT_API_URL) {
       console.log('ℹ️ MAIN_BOT_API_URL не настроен - работаем в автономном режиме');
     }
-    
+
     if (!config.ADMIN_ID) {
       console.warn('⚠️ ADMIN_ID не настроен - админ-панель будет ограничена');
     }
-    
+
     console.log('✅ Конфигурация валидна');
   }
 
