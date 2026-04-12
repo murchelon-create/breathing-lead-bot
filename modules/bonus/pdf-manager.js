@@ -84,7 +84,7 @@ getBonusForUser(analysisResult, surveyData) {
       message += `• 📅 План освоения на 3 дня\n`;
       message += `• 💡 Советы по мотивации ребенка\n\n`;
     } else {
-      message += `• 🌬️ Одна мощная техника с пошаговой инструкцией\n`;
+      message += `• 🍬️ Одна мощная техника с пошаговой инструкцией\n`;
       message += `• 🧠 Научное обоснование\n`;
       message += `• 📅 План освоения на 3 дня\n`;
       message += `• 🎯 Четкие ожидаемые результаты\n\n`;
@@ -102,13 +102,7 @@ getBonusForUser(analysisResult, surveyData) {
     }
 
     message += `📞 *ХОТИТЕ БОЛЬШЕ ТЕХНИК?*\n`;
-    message += `Дополнительные бонусы для взрослых и детей доступны в разделе материалов ниже.\n\n`;
-    message += `На персональной консультации получите:\n`;
-    message += `• Полная программа под вашу ситуацию\n`;
-    message += `• План на 30 дней\n`;
-    message += `• Контроль прогресса\n`;
-    message += `• Ответы на все вопросы\n\n`;
-    message += `👨‍⚕️ [Записаться на консультацию](https://t.me/breathing_opros_bot)`;
+    message += `Дополнительные бонусы для взрослых и детей доступны в разделе материалов ниже.`;
     return message;
   }
 
@@ -116,7 +110,6 @@ getBonusForUser(analysisResult, surveyData) {
   generateBonusKeyboard(bonus, type) {
     return Markup.inlineKeyboard([
       [Markup.button.callback('📥 Получить мой гид', `download_${bonus.id}`)],
-      [Markup.button.callback('📞 Хочу больше техник!', 'contact_request')],
       [Markup.button.callback('🎁 Дополнительные материалы', 'more_materials')],
       [Markup.button.url('💬 Написать Александру', 'https://t.me/breathing_opros_bot')]
     ]);
@@ -222,7 +215,7 @@ getBonusForUser(analysisResult, surveyData) {
     };
   }
 
-  // Добавь этот новый метод в класс PDFManager (в любое место внутри класса)
+  // Статичный fallback бонус
 getStaticFallbackBonus(analysisResult) {
   const isChildFlow = analysisResult.analysisType === 'child';
 
@@ -271,9 +264,10 @@ getStaticFallbackBonus(analysisResult) {
     await ctx.editMessageText(message, {
       parse_mode: 'Markdown',
       ...Markup.inlineKeyboard([
-        [Markup.button.callback('📞 Записаться на консультацию', 'contact_request')],
+        [Markup.button.callback('🛒 Заказать Стартовый комплект', 'order_starter')],
+        [Markup.button.callback('👨‍⚕️ Записаться на консультацию', 'order_individual')],
         [Markup.button.url('💬 Написать Александру', 'https://t.me/breathing_opros_bot')],
-        [Markup.button.callback('🔙 Назад', 'back_to_results')]
+        [Markup.button.callback('🔙 Назад к результатам', 'back_to_results')]
       ])
     });
   }
@@ -302,7 +296,7 @@ getStaticFallbackBonus(analysisResult) {
   async showProgramHelper(ctx) {
     const message = `🤔 *ПОМОЩЬ В ВЫБОРЕ ПРОГРАММЫ*\n\n` +
       `Не знаете, какая программа вам подойдет?\n\n` +
-      `📞 [Александр Попов](https://t.me/breathing_opros_bot) поможет:\n` +
+      `📞 [Александр Попов](https://t.me/NastuPopova) поможет:\n` +
       `• Определить ваши приоритеты\n` +
       `• Подобрать оптимальную программу\n` +
       `• Составить индивидуальный план\n` +
