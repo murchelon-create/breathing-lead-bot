@@ -955,9 +955,9 @@ class FileHandler {
       `Я сам астматик с 30-летним стажем.\n` +
       `Метод изменил мою жизнь — помогу и вам.`;
 
+    // Одна широкая кнопка на всю ширину
     const keyboard = [
-      [Markup.button.url('👉 Записаться на пробное занятие — 1 500 ₽', 'https://t.me/spokoinoe_dyhanie')],
-      [Markup.button.url('🌐 Узнать подробнее на сайте', 'https://dyhanie-buteiko72.ru')]
+      [Markup.button.url('👉  Записаться на пробное занятие  —  1 500 ₽', 'https://t.me/spokoinoe_dyhanie')]
     ];
 
     await ctx.reply(message, {
