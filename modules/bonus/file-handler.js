@@ -715,7 +715,7 @@ class FileHandler {
     console.log('PDF успешно отправлен');
     this.bonusStats.byDeliveryMethod.file++;
 
-    // Только после успешной отправки — показываем финальное меню
+    // Только после успешной отправки — показываем финальный CTA-блок
     await this.showPostPDFMenu(ctx);
 
     // Удаляем временный файл
@@ -938,27 +938,34 @@ class FileHandler {
       );
     }
   }
-async showPostPDFMenu(ctx) {
-  const message = `✅ *Ваш персональный гид отправлен!*\n\n` +
-    `🎯 *Что дальше?*\n` +
-    `• Изучите технику и начните практиковать уже сегодня\n` +
-    `• При вопросах — пишите Александру лично\n\n` +
-    `Понравился гид? Поделитесь с друзьями — дыхание меняет жизнь! 🌿`;
 
-  const keyboard = [
-    // Кнопка "Поделиться" — вирусность без навязывания продажи
-    [Markup.button.switchToChat('📤 Поделиться с друзьями', 'Я прошёл диагностику дыхания и получил персональный гид! Очень круто 🌬️\nПройди и ты: @breathing_opros_bot')],
+  // ===== ФИНАЛЬНЫЙ CTA-БЛОК ПОСЛЕ PDF =====
+  // Показывается один раз — после получения PDF-гида.
+  // Цель: перевести тёплого лида в первую оплату (пробное занятие 1 500 ₽).
+  async showPostPDFMenu(ctx) {
+    const message =
+      `🎯 *ХОТИТЕ ПОЧУВСТВОВАТЬ РЕЗУЛЬТАТ УЖЕ СЕГОДНЯ?*\n\n` +
+      `Проведу с вами персональное пробное занятие\n` +
+      `по методу Бутейко — онлайн, 40 минут.\n\n` +
+      `Что будет на занятии:\n` +
+      `• Измерим вашу контрольную паузу (до и после)\n` +
+      `• Снимем симптомы прямо на занятии\n` +
+      `• Дам домашнее задание и буду на связи\n\n` +
+      `Стоимость — 1 500 ₽\n\n` +
+      `Я сам астматик с 30-летним стажем.\n` +
+      `Метод изменил мою жизнь — помогу и вам.`;
 
-    // Мягкий переход в канал (дополнительная ценность)
-    [Markup.button.url('🌿 Полезные статьи и практики в канале', 'https://t.me/spokoinoe_dyhanie')],
-  ];
+    const keyboard = [
+      [Markup.button.url('👉 Записаться на пробное занятие — 1 500 ₽', 'https://t.me/spokoinoe_dyhanie')],
+      [Markup.button.url('🌐 Узнать подробнее на сайте', 'https://dyhanie-buteiko72.ru')]
+    ];
 
-  await ctx.reply(message, {
-    parse_mode: 'Markdown',
-    disable_web_page_preview: true,
-    ...Markup.inlineKeyboard(keyboard)
-  });
-}
+    await ctx.reply(message, {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: true,
+      ...Markup.inlineKeyboard(keyboard)
+    });
+  }
 
   async closeMenu(ctx) {
     console.log(`🗑️ Удаление меню для пользователя ${ctx.from.id}`);
