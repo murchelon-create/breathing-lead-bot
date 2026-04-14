@@ -26,69 +26,94 @@ app.use((req, res, next) => {
 // Health-check
 app.get('/', (req, res) => res.json({ ok: true, service: 'BreathingLeadBot' }));
 
+// ─── Вспомогательная функция: сборка userData ────────────────────────────────
+function buildUserData(body) {
+  const { name, phone, email, tg, segment, score, profile, tech, goals } = body || {};
+
+  const segmentMap = {
+    'hot':      'HOT_LEAD',
+    'mild':     'WARM_LEAD',
+    'moderate': 'WARM_LEAD',
+    'severe':   'HOT_LEAD',
+    'good':     'COLD_LEAD'
+  };
+  const internalSegment = segmentMap[segment] || 'WARM_LEAD';
+  const landingId = `landing_${Date.now()}`;
+
+  return {
+    source: 'landing',
+    userInfo: {
+      telegram_id: landingId,
+      first_name:  name,
+      username:    tg ? tg.replace('@', '') : null,
+      phone:       phone  || null,
+      email:       email  || null,
+    },
+    surveyType: 'adult',
+    surveyAnswers: {
+      phone:   phone   || null,
+      email:   email   || null,
+      tg:      tg      || null,
+      goals:   goals   || null,
+      profile: profile || null,
+      tech:    tech    || null,
+    },
+    analysisResult: {
+      segment:      internalSegment,
+      primaryIssue: profile || 'general_wellness',
+      scores: {
+        total:     typeof score === 'number' ? score : parseInt(score) || 0,
+        urgency:   internalSegment === 'HOT_LEAD'  ? 85 :
+                   internalSegment === 'WARM_LEAD' ? 60 : 35,
+        readiness: internalSegment === 'HOT_LEAD'  ? 80 :
+                   internalSegment === 'WARM_LEAD' ? 55 : 30,
+        fit:       typeof score === 'number' ? score : parseInt(score) || 0,
+      },
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+// ─── Сохранение лида в leadDataStorage (всегда) ───────────────────────────────
+function saveLeadToStorage(userData) {
+  try {
+    if (!global.botInstance) return;
+    if (!global.botInstance.adminNotifications) return;
+
+    if (!global.botInstance.adminNotifications.leadDataStorage) {
+      global.botInstance.adminNotifications.leadDataStorage = {};
+    }
+
+    const id = userData.userInfo.telegram_id;
+    global.botInstance.adminNotifications.leadDataStorage[id] = userData;
+    console.log(`💾 Лид сохранён в leadDataStorage: ${id}`);
+  } catch (e) {
+    console.warn('⚠️ Не удалось сохранить лид в storage:', e.message);
+  }
+}
+
 // ─── /notify-lead — лид с лендинга ───────────────────────────────────────────
 app.post('/notify-lead', async (req, res) => {
   try {
-    const { name, phone, email, tg, segment, score, profile, tech, goals } = req.body || {};
+    const { name, phone, email } = req.body || {};
 
-    // Валидация: нужно имя + хотя бы один контакт (email ИЛИ телефон)
     if (!name || (!phone && !email)) {
       return res.status(400).json({ ok: false, error: 'name и email/phone обязательны' });
     }
 
-    // Fallback если бот ещё не готов
+    const userData = buildUserData(req.body);
+
+    // Сохраняем в storage в любом случае
+    saveLeadToStorage(userData);
+
     if (!global.botInstance || !global.botInstance.adminNotifications) {
       console.warn('⚠️ /notify-lead: бот ещё не готов, отправляем через raw API');
       return await sendRawTelegram(req.body, res);
     }
 
-    const segmentMap = {
-      'hot':      'HOT_LEAD',
-      'mild':     'WARM_LEAD',
-      'moderate': 'WARM_LEAD',
-      'severe':   'HOT_LEAD',
-      'good':     'COLD_LEAD'
-    };
-    const internalSegment = segmentMap[segment] || 'WARM_LEAD';
-
-    const landingId = `landing_${Date.now()}`;
-
-    const userData = {
-      source: 'landing',
-      userInfo: {
-        telegram_id: landingId,
-        first_name:  name,
-        username:    tg ? tg.replace('@', '') : null,
-        phone:       phone  || null,
-        email:       email  || null,
-      },
-      surveyType: 'adult',
-      surveyAnswers: {
-        phone:   phone   || null,
-        email:   email   || null,
-        tg:      tg      || null,
-        goals:   goals   || null,
-        profile: profile || null,
-        tech:    tech    || null,
-      },
-      analysisResult: {
-        segment:      internalSegment,
-        primaryIssue: profile || 'general_wellness',
-        scores: {
-          total:     typeof score === 'number' ? score : parseInt(score) || 0,
-          urgency:   internalSegment === 'HOT_LEAD'  ? 85 :
-                     internalSegment === 'WARM_LEAD' ? 60 : 35,
-          readiness: internalSegment === 'HOT_LEAD'  ? 80 :
-                     internalSegment === 'WARM_LEAD' ? 55 : 30,
-          fit:       typeof score === 'number' ? score : parseInt(score) || 0,
-        },
-      },
-      timestamp: new Date().toISOString(),
-    };
-
     await global.botInstance.adminNotifications.notifyNewLead(userData);
 
-    console.log(`✅ Лид с лендинга: ${name} | ${phone || email} | ${internalSegment}`);
+    console.log(`✅ Лид с лендинга: ${name} | ${phone || email} | ${userData.analysisResult.segment}`);
     res.json({ ok: true });
 
   } catch (err) {
@@ -110,6 +135,10 @@ async function sendRawTelegram(body, res) {
   if (!adminId || !token) {
     return res.status(500).json({ ok: false, error: 'Сервер не настроен (нет токена/chat_id)' });
   }
+
+  // Сохраняем лид в storage даже при fallback
+  const userData = buildUserData(body);
+  saveLeadToStorage(userData);
 
   const esc = s => String(s || '—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
