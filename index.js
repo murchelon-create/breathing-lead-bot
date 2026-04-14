@@ -4,10 +4,11 @@
 const BreathingLeadBot = require('./core/bot');
 const express = require('express');
 const config  = require('./config');
+const { saveLandingLead } = require('./modules/admin/landing_lead_watcher');
 
-console.log('🌬️ Запуск BreathingLeadBot v2.5...');
+console.log('🌬️ Запуск BreathingLeadBot v2.9.1...');
 
-// ─── HTTP-сервер ─────────────────────────────────────────────────────────────
+// ─── HTTP-сервер ───────────────────────────────────────────────────────────────────────────────
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -24,9 +25,9 @@ app.use((req, res, next) => {
 });
 
 // Health-check
-app.get('/', (req, res) => res.json({ ok: true, service: 'BreathingLeadBot' }));
+app.get('/', (req, res) => res.json({ ok: true, service: 'BreathingLeadBot', version: '2.9.1' }));
 
-// ─── Вспомогательная функция: сборка userData ────────────────────────────────
+// ─── Вспомогательная функция: сборка userData ────────────────────────────────────────────────
 function buildUserData(body) {
   const { name, phone, email, tg, segment, score, profile, tech, goals } = body || {};
 
@@ -38,7 +39,7 @@ function buildUserData(body) {
     'good':     'COLD_LEAD'
   };
   const internalSegment = segmentMap[segment] || 'WARM_LEAD';
-  const landingId = `landing_${Date.now()}`;
+  const landingId = email || phone || `landing_${Date.now()}`;
 
   return {
     source: 'landing',
@@ -74,25 +75,29 @@ function buildUserData(body) {
   };
 }
 
-// ─── Сохранение лида в leadDataStorage (всегда) ───────────────────────────────
+// ─── Сохранение лида: память + файл ──────────────────────────────────────────────────────────────────────
 function saveLeadToStorage(userData) {
   try {
-    if (!global.botInstance) return;
-    if (!global.botInstance.adminNotifications) return;
+    // 1. Сохраняем в файл (leads.json) — персистентно, переживает перезапуск
+    saveLandingLead(userData);
 
-    if (!global.botInstance.adminNotifications.leadDataStorage) {
-      global.botInstance.adminNotifications.leadDataStorage = {};
+    // 2. Сохраняем в память (для текущей сессии)
+    if (global.botInstance?.adminNotifications) {
+      if (!global.botInstance.adminNotifications.leadDataStorage) {
+        global.botInstance.adminNotifications.leadDataStorage = {};
+      }
+      const id = userData.userInfo.telegram_id;
+      global.botInstance.adminNotifications.leadDataStorage[id] = userData;
+      console.log(`💾 Лид сохранён в файл + память: ${id}`);
+    } else {
+      console.log(`💾 Лид сохранён в файл (бот ещё не готов): ${userData.userInfo.telegram_id}`);
     }
-
-    const id = userData.userInfo.telegram_id;
-    global.botInstance.adminNotifications.leadDataStorage[id] = userData;
-    console.log(`💾 Лид сохранён в leadDataStorage: ${id}`);
   } catch (e) {
-    console.warn('⚠️ Не удалось сохранить лид в storage:', e.message);
+    console.warn('⚠️ Не удалось сохранить лид:', e.message);
   }
 }
 
-// ─── /notify-lead — лид с лендинга ───────────────────────────────────────────
+// ─── /notify-lead — лид с лендинга ─────────────────────────────────────────────────────────────────────
 app.post('/notify-lead', async (req, res) => {
   try {
     const { name, phone, email } = req.body || {};
@@ -103,7 +108,7 @@ app.post('/notify-lead', async (req, res) => {
 
     const userData = buildUserData(req.body);
 
-    // Сохраняем в storage в любом случае
+    // Сохраняем в файл + память
     saveLeadToStorage(userData);
 
     if (!global.botInstance || !global.botInstance.adminNotifications) {
@@ -124,7 +129,7 @@ app.post('/notify-lead', async (req, res) => {
   }
 });
 
-// ─── Fallback: прямой вызов Telegram API ─────────────────────────────────────
+// ─── Fallback: прямой вызов Telegram API ──────────────────────────────────────────────────────────────────
 async function sendRawTelegram(body, res) {
   const { name, phone, email, tg, segment, score, profile, tech } = body || {};
 
@@ -136,16 +141,15 @@ async function sendRawTelegram(body, res) {
     return res.status(500).json({ ok: false, error: 'Сервер не настроен (нет токена/chat_id)' });
   }
 
-  // Сохраняем лид в storage даже при fallback
-  const userData = buildUserData(body);
-  saveLeadToStorage(userData);
+  // Сохраняем лид в файл даже при fallback
+  saveLeadToStorage(buildUserData(body));
 
   const esc = s => String(s || '—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   const text =
     '🌐 <b>Новый лид с сайта (анкета)</b>\n\n' +
     `👤 <b>Имя:</b> ${esc(name)}\n` +
-    (phone ? `📱 <b>Телефон:</b> ${esc(phone)}\n` : '') +
+    (phone ? `📞 <b>Телефон:</b> ${esc(phone)}\n` : '') +
     (email ? `📧 <b>Email:</b> ${esc(email)}\n`   : '') +
     (tg    ? `✈️ <b>Telegram:</b> ${esc(tg)}\n`   : '') +
     `\n📊 Сегмент: ${esc(segment)} | Балл: ${score || '?'}/100\n` +
@@ -169,7 +173,7 @@ app.listen(PORT, () => {
   console.log(`🌐 HTTP-сервер запущен на порту ${PORT}`);
 });
 
-// ─── Запуск Telegram-бота ─────────────────────────────────────────────────────
+// ─── Запуск Telegram-бота ──────────────────────────────────────────────────────────────────────────────
 async function startBot() {
   try {
     const bot = new BreathingLeadBot();
