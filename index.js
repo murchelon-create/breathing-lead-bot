@@ -27,35 +27,21 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => res.json({ ok: true, service: 'BreathingLeadBot' }));
 
 // ─── /notify-lead — лид с лендинга ───────────────────────────────────────────
-// Принимает данные анкеты с сайта и передаёт в AdminNotificationSystem,
-// чтобы лид попал в статистику (горячие/тёплые/холодные) и leadDataStorage.
-//
-// Ожидаемое тело запроса:
-//   name     string  — имя
-//   phone    string  — телефон (обязательно)
-//   email    string  — email
-//   tg       string  — telegram username
-//   segment  string  — 'hot' | 'mild' | 'moderate' | 'severe'  (с лендинга)
-//   score    number  — итоговый балл (0-100)
-//   profile  string  — описание профиля
-//   tech     string  — рекомендованная техника
-//   goals    string  — цели пользователя
-
 app.post('/notify-lead', async (req, res) => {
   try {
     const { name, phone, email, tg, segment, score, profile, tech, goals } = req.body || {};
 
-    if (!name || !phone) {
-      return res.status(400).json({ ok: false, error: 'name и phone обязательны' });
+    // Валидация: нужно имя + хотя бы один контакт (email ИЛИ телефон)
+    if (!name || (!phone && !email)) {
+      return res.status(400).json({ ok: false, error: 'name и email/phone обязательны' });
     }
 
-    // Ждём пока бот будет готов (на случай очень быстрого запроса при старте)
+    // Fallback если бот ещё не готов
     if (!global.botInstance || !global.botInstance.adminNotifications) {
       console.warn('⚠️ /notify-lead: бот ещё не готов, отправляем через raw API');
       return await sendRawTelegram(req.body, res);
     }
 
-    // Маппинг сегмента с лендинга → внутренний сегмент AdminNotificationSystem
     const segmentMap = {
       'hot':      'HOT_LEAD',
       'mild':     'WARM_LEAD',
@@ -65,29 +51,25 @@ app.post('/notify-lead', async (req, res) => {
     };
     const internalSegment = segmentMap[segment] || 'WARM_LEAD';
 
-    // Уникальный ID для лида с лендинга
     const landingId = `landing_${Date.now()}`;
 
-    // Формируем объект userData в формате AdminNotificationSystem
     const userData = {
-      source: 'landing',           // пометка источника — видна в CSV
+      source: 'landing',
       userInfo: {
         telegram_id: landingId,
         first_name:  name,
         username:    tg ? tg.replace('@', '') : null,
-        phone:       phone,
-        email:       email
+        phone:       phone  || null,
+        email:       email  || null,
       },
       surveyType: 'adult',
       surveyAnswers: {
-        // Контактные данные (для отображения в уведомлении)
-        phone:   phone,
-        email:   email,
-        tg:      tg,
-        // Анкетные данные
-        goals:   goals || null,
+        phone:   phone   || null,
+        email:   email   || null,
+        tg:      tg      || null,
+        goals:   goals   || null,
         profile: profile || null,
-        tech:    tech || null
+        tech:    tech    || null,
       },
       analysisResult: {
         segment:      internalSegment,
@@ -98,61 +80,59 @@ app.post('/notify-lead', async (req, res) => {
                      internalSegment === 'WARM_LEAD' ? 60 : 35,
           readiness: internalSegment === 'HOT_LEAD'  ? 80 :
                      internalSegment === 'WARM_LEAD' ? 55 : 30,
-          fit:       typeof score === 'number' ? score : parseInt(score) || 0
-        }
+          fit:       typeof score === 'number' ? score : parseInt(score) || 0,
+        },
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    // Вызываем AdminNotificationSystem — лид попадёт в статистику и уведомление
     await global.botInstance.adminNotifications.notifyNewLead(userData);
 
-    console.log(`✅ Лид с лендинга передан в AdminNotificationSystem: ${name} | ${phone} | ${internalSegment}`);
+    console.log(`✅ Лид с лендинга: ${name} | ${phone || email} | ${internalSegment}`);
     res.json({ ok: true });
 
   } catch (err) {
     console.error('❌ /notify-lead error:', err.message);
-    // Fallback: попробуем хотя бы сырой Telegram
     try { await sendRawTelegram(req.body, res); } catch (e) {
       res.status(500).json({ ok: false, error: 'Внутренняя ошибка сервера' });
     }
   }
 });
 
-// ─── Fallback: прямой вызов Telegram API (если бот ещё не готов) ──────────────
+// ─── Fallback: прямой вызов Telegram API ─────────────────────────────────────
 async function sendRawTelegram(body, res) {
   const { name, phone, email, tg, segment, score, profile, tech } = body || {};
 
-  const adminId = process.env.ADMIN_ID || config.ADMIN_ID;
+  const adminId = process.env.ADMIN_CHAT_ID || process.env.ADMIN_ID || config.ADMIN_ID;
   const token   = process.env.LEAD_BOT_TOKEN || process.env.BOT_TOKEN
     || process.env.TOKEN || process.env.API_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
 
   if (!adminId || !token) {
-    return res.status(500).json({ ok: false, error: 'Сервер не настроен' });
+    return res.status(500).json({ ok: false, error: 'Сервер не настроен (нет токена/chat_id)' });
   }
 
-  const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc = s => String(s || '—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   const text =
     '🌐 <b>Новый лид с сайта (анкета)</b>\n\n' +
     `👤 <b>Имя:</b> ${esc(name)}\n` +
-    `📱 <b>Телефон:</b> ${esc(phone)}\n` +
-    `📧 <b>Email:</b> ${esc(email)}\n` +
-    (tg ? `✈️ <b>Telegram:</b> ${esc(tg)}\n` : '') +
+    (phone ? `📱 <b>Телефон:</b> ${esc(phone)}\n` : '') +
+    (email ? `📧 <b>Email:</b> ${esc(email)}\n`   : '') +
+    (tg    ? `✈️ <b>Telegram:</b> ${esc(tg)}\n`   : '') +
     `\n📊 Сегмент: ${esc(segment)} | Балл: ${score || '?'}/100\n` +
     `💡 Профиль: ${esc(profile)}\n` +
     `🧘 Техника: ${esc(tech)}\n` +
-    `\n🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' })}`;
+    `\n🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' })}`;
 
   const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: adminId, text, parse_mode: 'HTML' })
+    body: JSON.stringify({ chat_id: adminId, text, parse_mode: 'HTML' }),
   });
   const data = await r.json();
   if (!data.ok) return res.status(502).json({ ok: false, error: data.description });
 
-  console.log(`✅ Лид отправлен (fallback raw API): ${name} | ${phone}`);
+  console.log(`✅ Лид отправлен (fallback): ${name} | ${phone || email}`);
   res.json({ ok: true, fallback: true });
 }
 
@@ -161,27 +141,18 @@ app.listen(PORT, () => {
 });
 
 // ─── Запуск Telegram-бота ─────────────────────────────────────────────────────
-
 async function startBot() {
   try {
     const bot = new BreathingLeadBot();
-    // Сохраняем экземпляр глобально — нужен для /notify-lead
     global.botInstance = bot;
     await bot.launch();
   } catch (error) {
     console.error('💥 Критическая ошибка запуска:', error.message);
-    console.error('Стек ошибки:', error.stack);
-    console.error('Детали:', {
-      name: error.name,
-      code: error.code,
-      response: error.response?.description || 'N/A',
-      timestamp: new Date().toISOString()
-    });
     process.exit(1);
   }
 }
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason) => {
   console.error('💥 Необработанное отклонение промиса:', reason);
 });
 
