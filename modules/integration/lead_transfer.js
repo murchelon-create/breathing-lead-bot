@@ -1,31 +1,168 @@
 // Файл: modules/integration/lead_transfer.js
-// ИСПРАВЛЕННАЯ ВЕРСИЯ - правильное сохранение лидов в adminNotifications
+// ИСПРАВЛЕННАЯ ВЕРСИЯ - правильное сохранение лидов в adminNotifications + Google Sheets
 
 const axios = require('axios');
 const config = require('../../config');
+
+// ─── Google Sheets helper ─────────────────────────────────────────────────────
+
+/**
+ * Создаёт подписанный JWT для Google Service Account и обменивает его
+ * на access_token через OAuth 2.0. Работает без npm-зависимостей (Web Crypto API).
+ */
+async function getGoogleAccessToken() {
+  const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+  const privateKey = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+
+  if (!clientEmail || !privateKey) {
+    throw new Error('GOOGLE_CLIENT_EMAIL или GOOGLE_PRIVATE_KEY не заданы');
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const header  = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss:   clientEmail,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud:   'https://oauth2.googleapis.com/token',
+    iat:   now,
+    exp:   now + 3600,
+  };
+
+  const encode = obj =>
+    Buffer.from(JSON.stringify(obj))
+      .toString('base64')
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+
+  const unsignedToken = `${encode(header)}.${encode(payload)}`;
+
+  const pemBody = privateKey
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '');
+  const keyDer = Buffer.from(pemBody, 'base64');
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    keyDer,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signatureBuffer = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    Buffer.from(unsignedToken)
+  );
+
+  const signature = Buffer.from(signatureBuffer)
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+
+  const jwt = `${unsignedToken}.${signature}`;
+
+  const tokenResp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
+  });
+
+  if (!tokenResp.ok) {
+    const e = await tokenResp.text();
+    throw new Error(`Google token error: ${e}`);
+  }
+
+  const { access_token } = await tokenResp.json();
+  return access_token;
+}
+
+/**
+ * Добавляет строку с данными лида в Google Sheets.
+ * Колонки: Дата | Источник | Имя | Телефон | Email | Сегмент | Счёт | Профиль |
+ *          Возраст | Деятельность | Проблемы | Главная проблема | Цели | Время | Хр. заболевания
+ */
+async function appendLeadToSheet(userData) {
+  const sheetId = process.env.GOOGLE_SHEET_ID;
+  if (!sheetId) {
+    console.warn('⚠️ GOOGLE_SHEET_ID не задан — пропускаем запись в Sheets');
+    return;
+  }
+
+  const accessToken = await getGoogleAccessToken();
+
+  const ui = userData.userInfo     || {};
+  const ar = userData.analysisResult || {};
+  const sa = userData.surveyAnswers  || {};
+
+  const now = new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' });
+
+  const row = [
+    now,                                             // Дата
+    userData.source || 'bot',                       // Источник
+    ui.first_name  || ui.username || '',             // Имя
+    sa.phone       || ui.phone    || '',             // Телефон
+    sa.email       || ui.email    || '',             // Email
+    ar.segment     || '',                            // Сегмент
+    ar.scores?.total ?? ar.score ?? '',              // Счёт
+    ar.profile     || ar.primaryIssue || '',         // Профиль
+    sa.age_group   || '',                            // Возраст
+    sa.occupation  || '',                            // Деятельность
+    sa.current_problems  || '',                      // Проблемы
+    sa.priority_problem  || '',                      // Главная проблема
+    sa.main_goals        || '',                      // Цели
+    sa.time_commitment   || '',                      // Время
+    sa.chronic_conditions || '',                     // Хр. заболевания
+  ];
+
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}` +
+    `/values/Sheet1!A1:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ values: [row] }),
+  });
+
+  if (!resp.ok) {
+    const e = await resp.text();
+    throw new Error(`Sheets append error: ${e}`);
+  }
+
+  return await resp.json();
+}
+
+// ─── LeadTransferSystem ───────────────────────────────────────────────────────
 
 class LeadTransferSystem {
   constructor(adminNotifications = null) {
     this.retryAttempts = 3;
     this.retryDelay = 2000;
-    
+
     this.mainBotWebhook = config.MAIN_BOT_API_URL;
     this.crmWebhook = config.CRM_WEBHOOK_URL;
     this.trainerContact = config.TRAINER_CONTACT;
-    
+
     this.enableRetries = true;
     this.enableLogging = config.NODE_ENV !== 'production';
-    
-    // ИСПРАВЛЕНО: Сохраняем ссылку на adminNotifications
+
     this.adminNotifications = adminNotifications;
-    
-    // ИСПРАВЛЕНО: Режим автономной работы
     this.standaloneMode = !this.mainBotWebhook;
-    
+
     if (this.standaloneMode) {
       console.log('🔄 LeadTransferSystem: Режим автономной работы (данные сохраняются локально)');
     }
-    
+
     if (!this.adminNotifications) {
       console.warn('⚠️ LeadTransferSystem: adminNotifications не передан - данные будут сохраняться только локально');
     }
@@ -35,19 +172,20 @@ class LeadTransferSystem {
     console.log('🚀 Начинаем обработку лида:', userData.userInfo?.telegram_id);
 
     try {
-      // ИСПРАВЛЕНО: Всегда сохраняем в adminNotifications первым делом
       await this.saveToAdminNotifications(userData);
-      
-      // ИСПРАВЛЕНО: Проверяем режим работы
+
+      // Запись в Google Sheets (параллельно, не блокирует основной поток)
+      appendLeadToSheet(userData)
+        .then(() => console.log('✅ Лид записан в Google Sheets'))
+        .catch(err => console.error('❌ Ошибка записи в Google Sheets:', err.message));
+
       if (this.standaloneMode) {
         console.log('💾 Автономный режим: лид сохранен локально');
         return await this.saveLeadLocally(userData);
       }
 
-      // Если есть основной бот - пытаемся передать
       await this.transferToMainBot(userData);
 
-      // CRM интеграция (если настроена)
       if (config.FEATURES?.enable_crm_integration && this.crmWebhook) {
         await this.transferToCRM(userData);
       } else {
@@ -55,11 +193,10 @@ class LeadTransferSystem {
       }
 
       await this.logLeadSuccess(userData);
-      
+
     } catch (error) {
       console.error('❌ Критическая ошибка обработки лида:', error.message);
-      
-      // ИСПРАВЛЕНО: В случае ошибки всегда сохраняем локально
+
       console.log('💾 Сохраняем лид локально из-за ошибки передачи');
       await this.saveToAdminNotifications(userData);
       await this.saveLeadLocally(userData);
@@ -67,9 +204,6 @@ class LeadTransferSystem {
     }
   }
 
-  /**
-   * НОВЫЙ МЕТОД: Сохранение в adminNotifications.leadDataStorage
-   */
   async saveToAdminNotifications(userData) {
     try {
       if (!this.adminNotifications) {
@@ -83,13 +217,11 @@ class LeadTransferSystem {
         return;
       }
 
-      // Инициализируем leadDataStorage если не существует
       if (!this.adminNotifications.leadDataStorage) {
         console.log('🔧 Инициализация leadDataStorage');
         this.adminNotifications.leadDataStorage = {};
       }
 
-      // Сохраняем полные данные лида
       this.adminNotifications.leadDataStorage[userId] = {
         userInfo: userData.userInfo,
         surveyType: userData.surveyType,
@@ -100,20 +232,17 @@ class LeadTransferSystem {
       };
 
       console.log(`✅ Лид ${userId} сохранен в adminNotifications.leadDataStorage`);
-      
-      // Также обновляем сегмент если есть метод
+
       if (this.adminNotifications.updateStoredSegment && userData.analysisResult?.segment) {
         this.adminNotifications.updateStoredSegment(userId, userData.analysisResult.segment);
       }
 
-      // Обновляем дневную статистику если есть метод
       if (this.adminNotifications.updateDailyStats && userData.analysisResult?.segment) {
         this.adminNotifications.updateDailyStats(userData.analysisResult.segment);
       }
 
     } catch (error) {
       console.error('❌ Ошибка сохранения в adminNotifications:', error);
-      // Не выбрасываем ошибку, чтобы не останавливать процесс
     }
   }
 
@@ -151,13 +280,12 @@ class LeadTransferSystem {
         }
       } catch (error) {
         console.error(`❌ Попытка ${attempt}/${this.retryAttempts} неудачна:`, error.message);
-        
+
         if (attempt === this.retryAttempts) {
           console.error('💥 Все попытки передачи в основной бот исчерпаны');
-          // ИСПРАВЛЕНО: Не выбрасываем ошибку, а сохраняем локально
           return this.saveLeadLocally(userData);
         }
-        
+
         if (this.enableRetries) {
           console.log(`⏳ Ожидание ${this.retryDelay}ms перед повтором...`);
           await new Promise(resolve => setTimeout(resolve, this.retryDelay));
@@ -211,10 +339,9 @@ class LeadTransferSystem {
         }
       } catch (error) {
         console.error(`❌ CRM попытка ${attempt}/${this.retryAttempts} неудачна:`, error.message);
-        
+
         if (attempt === this.retryAttempts) {
           console.error('💥 Все попытки передачи в CRM исчерпаны');
-          // ИСПРАВЛЕНО: Не останавливаем процесс, просто логируем
         } else if (this.enableRetries) {
           console.log(`⏳ Ожидание ${this.retryDelay}ms перед повтором...`);
           await new Promise(resolve => setTimeout(resolve, this.retryDelay));
@@ -234,8 +361,6 @@ class LeadTransferSystem {
         primary_issue: userData.analysisResult?.primaryIssue,
         answers: userData.surveyAnswers,
         trainer_contact: this.trainerContact,
-        
-        // ИСПРАВЛЕНО: Добавляем дополнительную информацию
         user_info: userData.userInfo,
         analysis_result: userData.analysisResult,
         saved_locally: true,
@@ -249,10 +374,10 @@ class LeadTransferSystem {
         timestamp: leadData.timestamp,
         mode: leadData.processing_mode
       }, null, 2));
-      
-      return { 
-        success: true, 
-        stored_locally: true, 
+
+      return {
+        success: true,
+        stored_locally: true,
         data: leadData,
         mode: this.standaloneMode ? 'standalone' : 'fallback'
       };
@@ -302,17 +427,18 @@ class LeadTransferSystem {
       main_bot: { status: 'not_configured', url: this.mainBotWebhook },
       crm: { status: 'not_configured', url: this.crmWebhook },
       admin_notifications: { status: this.adminNotifications ? 'connected' : 'not_configured' },
+      google_sheets: { status: process.env.GOOGLE_SHEET_ID ? 'configured' : 'not_configured' },
       standalone_mode: this.standaloneMode,
       timestamp: new Date().toISOString()
     };
 
     if (this.mainBotWebhook) {
       try {
-        const response = await axios.get(`${this.mainBotWebhook}/api/health`, { 
+        const response = await axios.get(`${this.mainBotWebhook}/api/health`, {
           timeout: 5000,
-          validateStatus: () => true // Принимаем любой статус для диагностики
+          validateStatus: () => true
         });
-        
+
         results.main_bot.status = response.status === 200 ? 'connected' : 'error';
         results.main_bot.response_time = response.headers['x-response-time'] || 'unknown';
         results.main_bot.http_status = response.status;
@@ -325,7 +451,7 @@ class LeadTransferSystem {
     if (this.crmWebhook) {
       try {
         const testPayload = { test: true, timestamp: Date.now() };
-        const response = await axios.post(this.crmWebhook, testPayload, { 
+        const response = await axios.post(this.crmWebhook, testPayload, {
           timeout: 5000,
           validateStatus: () => true
         });
@@ -345,12 +471,13 @@ class LeadTransferSystem {
       configuration: {
         main_bot_configured: !!this.mainBotWebhook,
         crm_configured: !!this.crmWebhook,
+        google_sheets_configured: !!process.env.GOOGLE_SHEET_ID,
         trainer_contact: this.trainerContact,
         retries_enabled: this.enableRetries,
         retry_attempts: this.retryAttempts,
         retry_delay: this.retryDelay,
         standalone_mode: this.standaloneMode,
-        admin_notifications_connected: !!this.adminNotifications // НОВОЕ
+        admin_notifications_connected: !!this.adminNotifications
       },
       endpoints: {
         main_bot: this.mainBotWebhook ? `${this.mainBotWebhook}/api/leads/import` : null,
@@ -358,10 +485,10 @@ class LeadTransferSystem {
         trainer: this.trainerContact
       },
       storage: {
-        leads_in_admin_panel: this.adminNotifications?.leadDataStorage ? 
+        leads_in_admin_panel: this.adminNotifications?.leadDataStorage ?
           Object.keys(this.adminNotifications.leadDataStorage).length : 0
       },
-      version: '2.5.0', // Увеличиваем версию
+      version: '2.6.0',
       last_updated: new Date().toISOString()
     };
   }
