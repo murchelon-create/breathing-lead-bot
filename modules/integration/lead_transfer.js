@@ -102,6 +102,18 @@ function formatScale(value) {
   return `${String(num).padStart(2, '0')}/10`;
 }
 
+// Безопасное преобразование любого значения в строку для Sheets
+function toSheetString(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    // Если объект — пробуем взять осмысленные строковые поля
+    return val.description || val.id || val.primaryIssue || val.name || '';
+  }
+  return String(val);
+}
+
 // ─── Google Sheets JWT ────────────────────────────────────────────────────────
 
 async function getGoogleAccessToken() {
@@ -191,26 +203,26 @@ async function appendLeadToSheet(userData) {
   const now = new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' });
 
   const row = [
-    now,                                                          // Дата
-    userData.source || 'bot',                                     // Источник
-    ui.first_name || ui.username || '',                           // Имя
-    sa.phone  || ui.phone  || '',                                 // Телефон
-    sa.email  || ui.email  || '',                                 // Email
-    SEGMENT_LABELS[ar.segment] || ar.segment || '',               // Сегмент (на русском)
-    ar.scores?.total ?? ar.score ?? '',                           // Счёт
-    ar.profile || ar.primaryIssue || '',                          // Профиль
-    translateValue(sa.age_group),                                 // Возраст
-    translateValue(sa.occupation),                                // Деятельность
-    formatScale(sa.stress_level),                                 // Стресс (05/10)
-    formatScale(sa.sleep_quality),                                // Сон (05/10)
-    translateValue(sa.breathing_method),                          // Тип дыхания
-    translateValue(sa.breathing_experience),                      // Опыт практик
-    translateValue(sa.current_problems),                          // Проблемы
-    translateValue(sa.priority_problem),                          // Главная проблема
-    translateValue(sa.main_goals),                                // Цели
-    translateValue(sa.time_commitment),                           // Время
-    translateValue(sa.format_preferences),                        // Форматы
-    translateValue(sa.chronic_conditions),                        // Хр. заболевания
+    now,                                                                    // Дата
+    userData.source || 'bot',                                               // Источник
+    ui.first_name || ui.username || '',                                     // Имя
+    sa.phone  || ui.phone  || '',                                           // Телефон
+    sa.email  || ui.email  || '',                                           // Email
+    SEGMENT_LABELS[ar.segment] || ar.segment || '',                         // Сегмент (на русском)
+    String(ar.scores?.total ?? ar.score ?? ''),                             // Счёт
+    toSheetString(ar.primaryIssue || ar.profile),                           // Профиль — только строка
+    translateValue(sa.age_group),                                           // Возраст
+    translateValue(sa.occupation),                                          // Деятельность
+    formatScale(sa.stress_level),                                           // Стресс (05/10)
+    formatScale(sa.sleep_quality),                                          // Сон (05/10)
+    translateValue(sa.breathing_method),                                    // Тип дыхания
+    translateValue(sa.breathing_experience),                                // Опыт практик
+    translateValue(sa.current_problems),                                    // Проблемы
+    translateValue(sa.priority_problem),                                    // Главная проблема
+    translateValue(sa.main_goals),                                          // Цели
+    translateValue(sa.time_commitment),                                     // Время
+    translateValue(sa.format_preferences),                                  // Форматы
+    translateValue(sa.chronic_conditions),                                  // Хр. заболевания
   ];
 
   const url =
@@ -564,7 +576,7 @@ class LeadTransferSystem {
         leads_in_admin_panel: this.adminNotifications?.leadDataStorage
           ? Object.keys(this.adminNotifications.leadDataStorage).length : 0,
       },
-      version:      '2.7.1',
+      version:      '2.7.2',
       last_updated: new Date().toISOString(),
     };
   }
