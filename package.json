@@ -1,6 +1,6 @@
 {
   "name": "breathing-lead-bot",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "Лидогенерирующий бот для диагностики дыхательных практик с VERSE-анализом и расширенной админ-панелью",
   "main": "index.js",
   "scripts": {
@@ -39,7 +39,6 @@
     "format-check": "prettier --check .",
     "type-check": "tsc --noEmit",
     
-    "prestart": "npm run health-check",
     "postinstall": "mkdir -p logs temp",
     
     "docker:build": "docker build -t breathing-lead-bot .",
@@ -68,6 +67,7 @@
   "license": "MIT",
   "dependencies": {
     "telegraf": "^4.15.6",
+    "telegraf-session-local": "^2.1.1",
     "axios": "^1.6.2",
     "dotenv": "^16.3.1",
     "pg": "^8.11.3",
@@ -214,6 +214,7 @@
     "ignore": [
       "logs/",
       "temp/",
+      "sessions.json",
       "node_modules/",
       "tests/"
     ],
