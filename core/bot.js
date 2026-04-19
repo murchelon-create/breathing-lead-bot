@@ -102,12 +102,8 @@ class BreathingLeadBot {
         this.adminIntegration.startAdminScheduler();
       }
 
-      this.telegramBot.on('callback_query', async (ctx) => {
-        const data = ctx.callbackQuery.data;
-        if (!data || data.startsWith('admin_')) return;
-        console.log('📋 Опросниковый callback:', data);
-        await ctx.answerCbQuery();
-      });
+      // ФИКС: удалён дублирующий callback_query handler,
+      // который повторно вызывал answerCbQuery() и мешал нормальной обработке callback-ов.
 
       this.setupErrorHandling();
       console.log('✅ Бот полностью настроен');
@@ -160,7 +156,7 @@ class BreathingLeadBot {
   getBotInfo() {
     return {
       name: 'BreathingLeadBot',
-      version: '2.9.0',
+      version: '2.9.1',
       status: 'running',
       uptime: process.uptime(),
       landing_lead_watcher: 'active',
