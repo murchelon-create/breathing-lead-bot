@@ -2,6 +2,7 @@
 
 const axios = require('axios');
 const config = require('../../config');
+const { webcrypto } = require('crypto');
 
 // ─── Переводы сегментов ───────────────────────────────────────────────────────
 
@@ -134,13 +135,13 @@ async function getGoogleAccessToken() {
     .replace(/\s+/g, '');
   const keyDer = Buffer.from(pemBody, 'base64');
 
-  const cryptoKey = await crypto.subtle.importKey(
+  const cryptoKey = await webcrypto.subtle.importKey(
     'pkcs8', keyDer,
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
     false, ['sign']
   );
 
-  const signatureBuffer = await crypto.subtle.sign(
+  const signatureBuffer = await webcrypto.subtle.sign(
     'RSASSA-PKCS1-v1_5', cryptoKey, Buffer.from(unsignedToken)
   );
 
@@ -563,7 +564,7 @@ class LeadTransferSystem {
         leads_in_admin_panel: this.adminNotifications?.leadDataStorage
           ? Object.keys(this.adminNotifications.leadDataStorage).length : 0,
       },
-      version:      '2.7.0',
+      version:      '2.7.1',
       last_updated: new Date().toISOString(),
     };
   }
