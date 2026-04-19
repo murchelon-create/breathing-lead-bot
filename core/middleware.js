@@ -1,5 +1,6 @@
-// Файл: core/middleware.js - ИСПРАВЛЕННАЯ ВЕРСИЯ с фиксом rate limiting
-const { session } = require('telegraf');
+// Файл: core/middleware.js - ИСПРАВЛЕННАЯ ВЕРСИЯ с персистентными сессиями
+// ФИКС: telegraf-session-local вместо in-memory session — сессии переживают рестарт
+const LocalSession = require('telegraf-session-local');
 const config = require('../config');
 
 class Middleware {
@@ -43,13 +44,36 @@ class Middleware {
     console.log('✅ Middleware настроен');
   }
 
-  // Настройка сессий
+  // ФИКС: Персистентные сессии через telegraf-session-local
+  // Сессии сохраняются в sessions.json и переживают перезапуск на Railway
   setupSessions() {
-    this.telegramBot.use(session({
-      defaultSession: () => this.getDefaultSession()
-    }));
+    const localSession = new LocalSession({
+      database: 'sessions.json',
+      getSessionKey: (ctx) => {
+        if (!ctx.from) return null;
+        return `${ctx.from.id}:${ctx.chat?.id || ctx.from.id}`;
+      },
+      property: 'session',
+      storage: LocalSession.storageFileAsync,
+      format: {
+        serialize: JSON.stringify,
+        deserialize: JSON.parse
+      }
+    });
 
-    console.log('✅ Сессии настроены');
+    this.telegramBot.use(localSession.middleware());
+
+    // Гарантируем дефолтную сессию если вдруг пустая
+    this.telegramBot.use(async (ctx, next) => {
+      if (!ctx.session || Object.keys(ctx.session).length === 0) {
+        ctx.session = this.getDefaultSession();
+        this.stats.sessionsCreated++;
+        console.log(`🆕 Новая сессия для пользователя ${ctx.from?.id}`);
+      }
+      return next();
+    });
+
+    console.log('✅ Персистентные сессии настроены (telegraf-session-local → sessions.json)');
   }
 
   // Настройка логирования
@@ -484,9 +508,9 @@ class Middleware {
   exportConfig() {
     return {
       name: 'Middleware',
-      version: '2.6.0',
+      version: '2.7.0',
       features: {
-        sessions: true,
+        sessions: 'telegraf-session-local (persistent)',
         logging: true,
         improved_rate_limiting: true,
         action_type_detection: true,
@@ -497,11 +521,12 @@ class Middleware {
       },
       stats: this.getStats(),
       configuration: {
-        cleanup_interval: 5 * 60 * 1000, // 5 минут
-        rate_limit_window: 60000, // 1 минута
-        session_timeout: 3600000, // 1 час
+        cleanup_interval: 5 * 60 * 1000,
+        rate_limit_window: 60000,
+        session_timeout: 3600000,
         max_unique_users: 1000,
-        improved_limits: true
+        improved_limits: true,
+        session_storage: 'sessions.json'
       },
       last_updated: new Date().toISOString()
     };
