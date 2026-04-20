@@ -487,7 +487,7 @@ class Handlers {
     if (validation.warning) {
       await ctx.answerCbQuery(validation.warning, { show_alert: true });
     } else {
-      await ctx.answerCbQuery('✅ Ответ сохранен');
+      await ctx.answerCbQuery();
     }
 
     ctx.session.answers[currentQuestion] = mappedValue;
@@ -507,6 +507,7 @@ class Handlers {
     const selected = ctx.session.answers[currentQuestion] || [];
 
     if (callbackData === 'nav_back') {
+      await ctx.answerCbQuery().catch(() => {});
       return await this.handleNavBack(ctx);
     }
 
