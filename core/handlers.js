@@ -64,14 +64,11 @@ class Handlers {
     console.log(`📋 Текущий вопрос в сессии: ${ctx.session?.currentQuestion}`);
     console.log(`${'='.repeat(50)}\n`);
 
-    // === РАЗДЕЛЯЕМ: admin vs опросник ===
     if (callbackData.startsWith('admin_')) {
       console.log('⏩ Admin-callback пропущен (обработает bot.action)');
       return;
     }
 
-
-    // === ПОЛУЧЕНИЕ ПЕРСОНАЛЬНОЙ ТЕХНИКИ - КРАСИВЫЙ ТИЗЕР ===
     if (callbackData === 'get_bonus') {
       console.log('🎁 Нажата кнопка: Получить персональную технику');
       await ctx.answerCbQuery('🧠 Готовлю ваш персональный гид...');
@@ -85,11 +82,9 @@ class Handlers {
           return;
         }
 
-        // Генерируем бонус
         const bonus = this.pdfManager.getBonusForUser(analysisResult, surveyAnswers);
         ctx.session.pendingBonus = bonus;
 
-        // === ИСПОЛЬЗУЕМ НОВЫЙ КРАСИВЫЙ ТИЗЕР ИЗ PDFManager ===
         const teaserMessage = this.pdfManager.generateBonusMessage(bonus, analysisResult);
 
         await ctx.reply(teaserMessage, {
@@ -107,112 +102,96 @@ class Handlers {
       return;
     }
 
-        // === СКАЧИВАНИЕ PDF ПО КНОПКЕ (ИСПРАВЛЕННАЯ ВЕРСИЯ ИЗ ДОКУМЕНТА 1) ===
-      if (callbackData === 'download_bonus') {
-        console.log('📥 Нажата кнопка: Получить мой гид (PDF)');
-        
-        // Сразу отвечаем, чтобы не было ошибки «Произошла ошибка»
-        await ctx.answerCbQuery('Готовлю ваш персональный гид...');
-        
-        try {
-          const bonus = ctx.session?.pendingBonus;
-
-          if (!bonus) {
-            await ctx.reply('😔 Гид не найден. Пройдите диагностику заново: /start');
-            return;
-          }
-
-          // ИСПРАВЛЕНО: используем существующий метод через bot.pdfManager
-         await this.pdfManager.fileHandler.sendPDFFile(ctx, bonus);
-
-          delete ctx.session.pendingBonus;
-
-        } catch (error) {
-          console.error('❌ Ошибка отправки гида:', error);
-          await ctx.reply('😔 Не удалось отправить файл. Напишите @NastuPopova — она пришлёт гид лично');
-        }
-        return;
-      }
-
-      // === ВОЗВРАТ К РЕЗУЛЬТАТАМ ===
-      if (callbackData === 'back_to_results') {
-        await ctx.answerCbQuery();
-        if (ctx.session?.analysisResult) {
-          await this.showResults(ctx, ctx.session.analysisResult);
-        }
-        return;
-      }
-
-      // === ВСЕ ОСТАЛЬНЫЕ CALLBACK'И (ОБРАБОТКА АНКЕТЫ) ===
+    if (callbackData === 'download_bonus') {
+      console.log('📥 Нажата кнопка: Получить мой гид (PDF)');
+      await ctx.answerCbQuery('Готовлю ваш персональный гид...');
       
-      // ПРИОРИТЕТНАЯ обработка "Подобрать программу"
-      if (callbackData === 'help_choose_program') {
-        return await this.handleProgramHelp(ctx);
-      }
+      try {
+        const bonus = ctx.session?.pendingBonus;
 
-      // Админка
-      if (callbackData.startsWith('admin_')) {
-        return; // админка обрабатывается отдельно
-      }
+        if (!bonus) {
+          await ctx.reply('😔 Гид не найден. Пройдите диагностику заново: /start');
+          return;
+        }
 
-      // Анкета: основные команды
-      if (callbackData === 'start_survey' || callbackData === 'start_survey_from_about') {
-        console.log('✅ Распознано: start_survey');
-        return await this.startSurvey(ctx);
-      }
-      if (callbackData === 'about_survey') {
-        console.log('✅ Распознано: about_survey');
-        return await this.showAboutSurvey(ctx);
-      }
-      if (callbackData === 'back_to_main') {
-        console.log('✅ Распознано: back_to_main');
-        return await this.backToMain(ctx);
-      }
+        await this.pdfManager.fileHandler.sendPDFFile(ctx, bonus);
+        delete ctx.session.pendingBonus;
 
-      // ВСЕ ОТВЕТЫ НА ВОПРОСЫ АНКЕТЫ
-      const isSurveyAnswer = 
-        callbackData.startsWith('age_') ||
-        callbackData.startsWith('prob_') ||
-        callbackData.startsWith('child_prob_') ||
-        callbackData.startsWith('goal_') ||
-        callbackData.startsWith('format_') ||
-        callbackData.startsWith('stress_') ||
-        callbackData.startsWith('sleep_') ||
-        callbackData.startsWith('breath_') ||
-        callbackData.startsWith('method_') ||
-        callbackData.startsWith('freq_') ||
-        callbackData.startsWith('shallow_') ||
-        callbackData.startsWith('exp_') ||
-        callbackData.startsWith('time_') ||
-        callbackData.startsWith('prio_') ||
-        callbackData.startsWith('med_') ||
-        callbackData.startsWith('meds_') ||
-        callbackData.startsWith('panic_') ||
-        callbackData.startsWith('env_') ||
-        callbackData.startsWith('work_') ||
-        callbackData.startsWith('occ_') ||
-        callbackData.startsWith('activity_') ||
-        callbackData.startsWith('condition_') ||
-        callbackData.startsWith('child_age_') ||
-        callbackData.startsWith('edu_') ||
-        callbackData.startsWith('schedule_') ||
-        callbackData.startsWith('parent_') ||
-        callbackData.startsWith('motivation_') ||
-        callbackData.startsWith('weight_') ||
-        callbackData.startsWith('both_parents') ||
-        callbackData.startsWith('mother') ||
-        callbackData.startsWith('father') ||
-        callbackData === 'nav_back' ||
-        callbackData.endsWith('_done');
-
-      if (isSurveyAnswer) {
-        console.log('✅ Распознано как ответ на анкету, отправляем в handleSurveyAnswer');
-        return await this.handleSurveyAnswer(ctx, callbackData);
+      } catch (error) {
+        console.error('❌ Ошибка отправки гида:', error);
+        await ctx.reply('😔 Не удалось отправить файл. Напишите @NastuPopova — она пришлёт гид лично');
       }
+      return;
+    }
 
-      console.log('⚠️ Callback не распознан ни одним обработчиком!');
-      this.logCallbackDiagnostics(ctx, callbackData);
-    });
+    if (callbackData === 'back_to_results') {
+      await ctx.answerCbQuery();
+      if (ctx.session?.analysisResult) {
+        await this.showResults(ctx, ctx.session.analysisResult);
+      }
+      return;
+    }
+
+    if (callbackData === 'help_choose_program') {
+      return await this.handleProgramHelp(ctx);
+    }
+
+    if (callbackData === 'start_survey' || callbackData === 'start_survey_from_about') {
+      console.log('✅ Распознано: start_survey');
+      return await this.startSurvey(ctx);
+    }
+    if (callbackData === 'about_survey') {
+      console.log('✅ Распознано: about_survey');
+      return await this.showAboutSurvey(ctx);
+    }
+    if (callbackData === 'back_to_main') {
+      console.log('✅ Распознано: back_to_main');
+      return await this.backToMain(ctx);
+    }
+
+    const isSurveyAnswer = 
+      callbackData.startsWith('age_') ||
+      callbackData.startsWith('prob_') ||
+      callbackData.startsWith('child_prob_') ||
+      callbackData.startsWith('goal_') ||
+      callbackData.startsWith('format_') ||
+      callbackData.startsWith('stress_') ||
+      callbackData.startsWith('sleep_') ||
+      callbackData.startsWith('breath_') ||
+      callbackData.startsWith('method_') ||
+      callbackData.startsWith('freq_') ||
+      callbackData.startsWith('shallow_') ||
+      callbackData.startsWith('exp_') ||
+      callbackData.startsWith('time_') ||
+      callbackData.startsWith('prio_') ||
+      callbackData.startsWith('med_') ||
+      callbackData.startsWith('meds_') ||
+      callbackData.startsWith('panic_') ||
+      callbackData.startsWith('env_') ||
+      callbackData.startsWith('work_') ||
+      callbackData.startsWith('occ_') ||
+      callbackData.startsWith('activity_') ||
+      callbackData.startsWith('condition_') ||
+      callbackData.startsWith('child_age_') ||
+      callbackData.startsWith('edu_') ||
+      callbackData.startsWith('schedule_') ||
+      callbackData.startsWith('parent_') ||
+      callbackData.startsWith('motivation_') ||
+      callbackData.startsWith('weight_') ||
+      callbackData.startsWith('both_parents') ||
+      callbackData.startsWith('mother') ||
+      callbackData.startsWith('father') ||
+      callbackData === 'nav_back' ||
+      callbackData.endsWith('_done');
+
+    if (isSurveyAnswer) {
+      console.log('✅ Распознано как ответ на анкету, отправляем в handleSurveyAnswer');
+      return await this.handleSurveyAnswer(ctx, callbackData);
+    }
+
+    console.log('⚠️ Callback не распознан ни одним обработчиком!');
+    this.logCallbackDiagnostics(ctx, callbackData);
+  });
   }
 
   setupTextHandlers() {
@@ -225,78 +204,25 @@ class Handlers {
     });
   }
 
-
-  
-  // === НОВЫЙ ВСПОМОГАТЕЛЬНЫЙ МЕТОД: ПОЛУЧЕНИЕ ОТЗЫВОВ (ИЗ ДОКУМЕНТА 2) ===
   getReviewsForTechnique(problem, isChild) {
     const reviewsMap = {
       adult: {
-        'Хронический стресс': [
-          'Быстро уходит внутреннее напряжение',
-          'Появляется ясность и контроль',
-          'Легче справляться с дедлайнами',
-          'Улучшается эмоциональный фон'
-        ],
-        'Высокое давление': [
-          'Давление приходит в норму',
-          'Головные боли уменьшаются',
-          'Улучшается самочувствие',
-          'Меньше зависимость от таблеток'
-        ],
-        'Головные боли': [
-          'Головные боли проходят за 5–7 минут',
-          'Уходит напряжение в висках и затылке',
-          'Появляется лёгкость в голове',
-          'Меньше нужно обезболивающих'
-        ],
-        'Бессонница': [
-          'Легче засыпаете',
-          'Сон становится глубже',
-          'Меньше ночных пробуждений',
-          'Утром чувствуете себя отдохнувшим'
-        ],
-        'Проблемы с концентрацией': [
-          'Уходит «туман в голове»',
-          'Появляется лёгкость и приток энергии',
-          'Мысли становятся упорядоченнее',
-          'Учёба/работа идёт легче и спокойнее'
-        ]
+        'Хронический стресс': ['Быстро уходит внутреннее напряжение','Появляется ясность и контроль','Легче справляться с дедлайнами','Улучшается эмоциональный фон'],
+        'Высокое давление': ['Давление приходит в норму','Головные боли уменьшаются','Улучшается самочувствие','Меньше зависимость от таблеток'],
+        'Головные боли': ['Головные боли проходят за 5–7 минут','Уходит напряжение в висках и затылке','Появляется лёгкость в голове','Меньше нужно обезболивающих'],
+        'Бессонница': ['Легче засыпаете','Сон становится глубже','Меньше ночных пробуждений','Утром чувствуете себя отдохнувшим'],
+        'Проблемы с концентрацией': ['Уходит «туман в голове»','Появляется лёгкость и приток энергии','Мысли становятся упорядоченнее','Учёба/работа идёт легче и спокойнее']
       },
       child: {
-        'Гиперактивность': [
-          'Меньше импульсивности',
-          'Легче выполнять задания',
-          'Улучшается самоконтроль',
-          'Ребёнок становится более уравновешенным'
-        ],
-        'Проблемы со сном': [
-          'Легче засыпает',
-          'Меньше кошмаров',
-          'Сон спокойнее',
-          'Утром бодрый'
-        ],
-        'Тревожность': [
-          'Меньше страхов',
-          'Увереннее в себе',
-          'Легче идёт в садик/школу',
-          'Спокойнее реагирует на новое'
-        ],
-        'Головные боли': [
-          'Головные боли проходят за 5–7 минут',
-          'Уходит напряжение в висках',
-          'Появляется лёгкость в голове',
-          'Реже нужны обезболивающие'
-        ]
+        'Гиперактивность': ['Меньше импульсивности','Легче выполнять задания','Улучшается самоконтроль','Ребёнок становится более уравновешенным'],
+        'Проблемы со сном': ['Легче засыпает','Меньше кошмаров','Сон спокойнее','Утром бодрый'],
+        'Тревожность': ['Меньше страхов','Увереннее в себе','Легче идёт в садик/школу','Спокойнее реагирует на новое'],
+        'Головные боли': ['Головные боли проходят за 5–7 минут','Уходит напряжение в висках','Появляется лёгкость в голове','Реже нужны обезболивающие']
       }
     };
 
     const source = isChild ? reviewsMap.child : reviewsMap.adult;
-    return source[problem] || [
-      'Становится легче дышать',
-      'Снижается внутреннее напряжение',
-      'Появляется ощущение контроля над состоянием',
-      'Улучшается общее самочувствие'
-    ];
+    return source[problem] || ['Становится легче дышать','Снижается внутреннее напряжение','Появляется ощущение контроля над состоянием','Улучшается общее самочувствие'];
   }
 
   getProgramNameByProblem(problem, isChild) {
@@ -344,7 +270,6 @@ class Handlers {
   async handleStart(ctx) {
     console.log(`Команда /start от пользователя ${ctx.from.id}`);
     
-    // Сброс сессии
     ctx.session = {
       ...ctx.session,
       currentQuestion: null,
@@ -355,15 +280,7 @@ class Handlers {
       analysisResult: null
     };
 
-    const welcomeText = `🫁 *Диагностика Дыхания*
-
-Узнайте, как ваше дыхание влияет на:
-• стресс и тревожность
-• сон и энергию
-• концентрацию
-• давление и самочувствие
-
-Быстрый тест покажет ваше текущее состояние и даст персональные рекомендации.`;
+    const welcomeText = `🪡 *Диагностика Дыхания*\n\nУзнайте, как ваше дыхание влияет на:\n• стресс и тревожность\n• сон и энергию\n• концентрацию\n• давление и самочувствие\n\nБыстрый тест покажет ваше текущее состояние и даст персональные рекомендации.`;
 
     await ctx.reply(welcomeText, {
       parse_mode: 'Markdown',
@@ -396,11 +313,7 @@ class Handlers {
   async showAboutSurvey(ctx) {
     await ctx.answerCbQuery().catch(() => {});
 
-    const text = `ℹ️ *О диагностике*
-
-Диагностика помогает определить, какие дыхательные паттерны могут влиять на ваше состояние.
-
-Вы ответите на несколько вопросов, после чего получите персональный разбор и рекомендации.`;
+    const text = `ℹ️ *О диагностике*\n\nДиагностика помогает определить, какие дыхательные паттерны могут влиять на ваше состояние.\n\nВы ответите на несколько вопросов, после чего получите персональный разбор и рекомендации.`;
 
     await ctx.reply(text, {
       parse_mode: 'Markdown',
@@ -449,7 +362,7 @@ class Handlers {
 
   async askQuestion(ctx, questionKey) {
     const askStartedAt = Date.now();
-    console.log(`📋 Задаем вопрос: ${questionKey}`);
+    console.log(`📋 Задаём вопрос: ${questionKey}`);
     
     if (!this.surveyQuestions) {
       console.error('❌ surveyQuestions не инициализирован!');
@@ -482,18 +395,12 @@ class Handlers {
       if (question.note) {
         await ctx.editMessageText(
           `${questionText}\n\n💡 ${question.note}`,
-          {
+          { parse_mode: 'Markdown', reply_markup: question.keyboard.reply_markup }
+        ).catch(async () => {
+          await ctx.reply(`${questionText}\n\n💡 ${question.note}`, {
             parse_mode: 'Markdown',
             reply_markup: question.keyboard.reply_markup
-          }
-        ).catch(async () => {
-          await ctx.reply(
-            `${questionText}\n\n💡 ${question.note}`,
-            {
-              parse_mode: 'Markdown',
-              reply_markup: question.keyboard.reply_markup
-            }
-          );
+          });
         });
       } else {
         await ctx.editMessageText(questionText, {
@@ -565,16 +472,10 @@ class Handlers {
       return await this.handleMultipleChoice(ctx, callbackData, question);
     }
 
-    console.log(`🔄 Маппинг значения...`);
     const mappedValue = this.surveyQuestions.mapCallbackToValue(callbackData);
-    
     console.log(`✅ Результат маппинга: "${mappedValue}"`);
 
-    const validation = this.surveyQuestions.validateAnswer(
-      currentQuestion,
-      mappedValue
-    );
-
+    const validation = this.surveyQuestions.validateAnswer(currentQuestion, mappedValue);
     console.log(`📋 Результат валидации:`, validation);
 
     if (!validation.valid) {
@@ -583,16 +484,12 @@ class Handlers {
       return;
     }
 
-    console.log(`✅ Валидация пройдена успешно`);
-
     if (validation.warning) {
-      console.log(`⚠️ Показываем предупреждение: ${validation.warning}`);
       await ctx.answerCbQuery(validation.warning, { show_alert: true });
     } else {
       await ctx.answerCbQuery('✅ Ответ сохранен');
     }
 
-    console.log(`💾 Сохранение ответа...`);
     ctx.session.answers[currentQuestion] = mappedValue;
     
     if (!ctx.session.completedQuestions.includes(currentQuestion)) {
@@ -600,7 +497,6 @@ class Handlers {
     }
 
     console.log(`✅ Ответ сохранен: ${currentQuestion} = ${mappedValue}`);
-    console.log(`➡️ Переход к следующему вопросу...`);
     
     await this.moveToNextQuestion(ctx);
     console.log(`⏱️ handleSurveyAnswer total: ${Date.now() - answerStartedAt}ms | callback=${callbackData} | question=${currentQuestion}`);
@@ -640,10 +536,21 @@ class Handlers {
     ctx.session.answers[currentQuestion] = nextSelected;
 
     const refreshedQuestion = this.surveyQuestions.getQuestion(currentQuestion);
-    const keyboard = this.surveyQuestions.buildMultipleChoiceKeyboard(
-      refreshedQuestion,
-      nextSelected
+
+    // Строим обновлённую клавиатуру из оригинала — помечаем выбранные ✅
+    const origRows = refreshedQuestion.keyboard.reply_markup.inline_keyboard;
+    const updatedRows = origRows.map(row =>
+      row.map(btn => {
+        if (!btn.callback_data || btn.callback_data === 'nav_back' || btn.callback_data.endsWith('_done')) {
+          return btn;
+        }
+        const val = this.surveyQuestions.mapCallbackToValue(btn.callback_data);
+        const isSelected = nextSelected.includes(val);
+        const cleanText = btn.text.replace(/^[✅☑️✓✔️]\s?/, '').trim();
+        return { ...btn, text: isSelected ? `✅ ${cleanText}` : cleanText };
+      })
     );
+    const keyboard = { reply_markup: { inline_keyboard: updatedRows } };
 
     const progress = this.surveyQuestions.getProgress(
       ctx.session.completedQuestions || [],
