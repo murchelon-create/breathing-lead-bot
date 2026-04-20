@@ -516,19 +516,26 @@ class Handlers {
         await ctx.answerCbQuery('Выберите хотя бы один вариант');
         return;
       }
-
-      await ctx.answerCbQuery('✅ Ответ сохранен');
-
+      // Тихо закрываем callback — без всплывающего тоста
+      await ctx.answerCbQuery();
       ctx.session.answers[currentQuestion] = selected;
       if (!ctx.session.completedQuestions.includes(currentQuestion)) {
         ctx.session.completedQuestions.push(currentQuestion);
       }
-
       return await this.moveToNextQuestion(ctx);
     }
 
     const mappedValue = this.surveyQuestions.mapCallbackToValue(callbackData);
     const exists = selected.includes(mappedValue);
+
+    // Проверяем лимит ДО добавления
+    if (!exists && question.maxSelections && selected.length >= question.maxSelections) {
+      await ctx.answerCbQuery(`Максимум ${question.maxSelections} вариант(а)`);
+      return;
+    }
+
+    // Отвечаем на callback ПЕРВЫМ — ускоряет отклик кнопки
+    await ctx.answerCbQuery().catch(() => {});
 
     const nextSelected = exists
       ? selected.filter(item => item !== mappedValue)
@@ -538,7 +545,6 @@ class Handlers {
 
     const refreshedQuestion = this.surveyQuestions.getQuestion(currentQuestion);
 
-    // Строим обновлённую клавиатуру из оригинала — помечаем выбранные ✅
     const origRows = refreshedQuestion.keyboard.reply_markup.inline_keyboard;
     const updatedRows = origRows.map(row =>
       row.map(btn => {
@@ -551,25 +557,21 @@ class Handlers {
         return { ...btn, text: isSelected ? `✅ ${cleanText}` : cleanText };
       })
     );
-    const keyboard = { reply_markup: { inline_keyboard: updatedRows } };
 
     const progress = this.surveyQuestions.getProgress(
       ctx.session.completedQuestions || [],
       ctx.session.answers || {}
     );
-
     const progressBar = this.generateProgressBar(progress.percentage);
     const questionText = `${progressBar}\n\n${refreshedQuestion.text}`;
 
-    await ctx.answerCbQuery(exists ? 'Убрано' : 'Добавлено');
-
     await ctx.editMessageText(questionText, {
       parse_mode: 'Markdown',
-      reply_markup: keyboard.reply_markup
+      reply_markup: { inline_keyboard: updatedRows }
     }).catch(async () => {
       await ctx.reply(questionText, {
         parse_mode: 'Markdown',
-        reply_markup: keyboard.reply_markup
+        reply_markup: { inline_keyboard: updatedRows }
       });
     });
   }
