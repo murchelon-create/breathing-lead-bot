@@ -70,8 +70,6 @@ class Handlers {
       return;
     }
 
-    // Остальные callback-и → опросник
-    await ctx.answerCbQuery().catch(() => {});
 
     // === ПОЛУЧЕНИЕ ПЕРСОНАЛЬНОЙ ТЕХНИКИ - КРАСИВЫЙ ТИЗЕР ===
     if (callbackData === 'get_bonus') {
