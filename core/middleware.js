@@ -44,8 +44,8 @@ class Middleware {
     console.log('✅ Middleware настроен');
   }
 
-  // ФИКС: Персистентные сессии через telegraf-session-local
-  // Сессии сохраняются в sessions.json и переживают перезапуск на Railway
+  // ФИКС: Сессии в памяти (storageMemory) — без записи на диск при каждом нажатии.
+  // storageFileAsync вызывал задержки 5-8 сек на Railway из-за перезаписи sessions.json.
   setupSessions() {
     const localSession = new LocalSession({
       database: 'sessions.json',
@@ -54,7 +54,7 @@ class Middleware {
         return `${ctx.from.id}:${ctx.chat?.id || ctx.from.id}`;
       },
       property: 'session',
-      storage: LocalSession.storageFileAsync,
+      storage: LocalSession.storageMemory, // ← ФИКС: было storageFileAsync
       format: {
         serialize: JSON.stringify,
         deserialize: JSON.parse
@@ -73,7 +73,7 @@ class Middleware {
       return next();
     });
 
-    console.log('✅ Персистентные сессии настроены (telegraf-session-local → sessions.json)');
+    console.log('✅ Сессии в памяти настроены (storageMemory — без задержек диска)');
   }
 
   // Настройка логирования
@@ -508,9 +508,9 @@ class Middleware {
   exportConfig() {
     return {
       name: 'Middleware',
-      version: '2.7.0',
+      version: '2.8.0',
       features: {
-        sessions: 'telegraf-session-local (persistent)',
+        sessions: 'telegraf-session-local (memory — no disk delay)',
         logging: true,
         improved_rate_limiting: true,
         action_type_detection: true,
@@ -526,7 +526,7 @@ class Middleware {
         session_timeout: 3600000,
         max_unique_users: 1000,
         improved_limits: true,
-        session_storage: 'sessions.json'
+        session_storage: 'memory (storageMemory)'
       },
       last_updated: new Date().toISOString()
     };
