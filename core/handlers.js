@@ -645,6 +645,30 @@ class Handlers {
     const analysisResult = this.verseAnalysis.analyze(answers);
     ctx.session.analysisResult = analysisResult;
 
+    // ── Передаём лид в leadTransfer → Google Sheets + уведомления ──
+    try {
+      if (this.leadTransfer?.processLead) {
+        await this.leadTransfer.processLead({
+          source: 'bot',
+          userInfo: {
+            telegram_id:   ctx.from?.id,
+            first_name:    ctx.from?.first_name,
+            username:      ctx.from?.username,
+            last_name:     ctx.from?.last_name     || '',
+            language_code: ctx.from?.language_code || ''
+          },
+          surveyType:    answers.age_group === 'for_child' ? 'child' : 'adult',
+          surveyAnswers: answers,
+          analysisResult
+        });
+        console.log('✅ Лид передан в leadTransfer');
+      } else {
+        console.warn('⚠️ leadTransfer.processLead недоступен');
+      }
+    } catch (error) {
+      console.error('❌ Ошибка при передаче лида:', error);
+    }
+
     await this.showResults(ctx, analysisResult);
   }
 
