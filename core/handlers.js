@@ -3,30 +3,44 @@
 
 const { Markup } = require('telegraf');
 const config = require('../config');
-const https = require('https');
 
-// Функция отправки заявки на прокси → Google Sheets purchases + Telegram-уведомление
-function notifyAdmin(data) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify(data);
-    const options = {
-      hostname: 'buteyko-api.bothost.tech',
-      path: '/notify',
+// Уведомление админу через прямой вызов Telegram Bot API
+async function notifyAdmin(data) {
+  const token   = process.env.BOT_TOKEN || process.env.LEAD_BOT_TOKEN;
+  const adminId = process.env.ADMIN_CHAT_ID || process.env.ADMIN_ID;
+
+  if (!token || !adminId) {
+    console.error('❌ notifyAdmin: не заданы BOT_TOKEN или ADMIN_CHAT_ID');
+    return;
+  }
+
+  const esc = s => String(s || '—')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const text =
+    `📅 <b>Новая заявка — Пробное занятие</b>\n\n` +
+    `👤 <b>Имя:</b> ${esc(data.name)}\n` +
+    `📞 <b>Телефон:</b> ${esc(data.phone)}\n` +
+    `✈️ <b>Telegram:</b> ${esc(data.telegram)}\n` +
+    `💰 <b>Продукт:</b> ${esc(data.product)} — ${esc(data.price)} ₽\n` +
+    `🔖 <b>Источник:</b> ${esc(data.source)}\n` +
+    `🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' })}`;
+
+  const res = await fetch(
+    `https://api.telegram.org/bot${token}/sendMessage`,
+    {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload)
-      }
-    };
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', chunk => body += chunk);
-      res.on('end', () => resolve(body));
-    });
-    req.on('error', reject);
-    req.write(payload);
-    req.end();
-  });
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: adminId, text, parse_mode: 'HTML' })
+    }
+  );
+
+  const json = await res.json();
+  if (!json.ok) throw new Error(`Telegram API error: ${json.description}`);
+  console.log('✅ Уведомление админу отправлено через Telegram API');
+  return json;
 }
 
 class Handlers {
@@ -580,7 +594,6 @@ class Handlers {
         await ctx.answerCbQuery('Выберите хотя бы один вариант');
         return;
       }
-      // Тихо закрываем callback — без всплывающего тоста
       await ctx.answerCbQuery();
       ctx.session.answers[currentQuestion] = selected;
       if (!ctx.session.completedQuestions.includes(currentQuestion)) {
@@ -592,13 +605,11 @@ class Handlers {
     const mappedValue = this.surveyQuestions.mapCallbackToValue(callbackData);
     const exists = selected.includes(mappedValue);
 
-    // Проверяем лимит ДО добавления
     if (!exists && question.maxSelections && selected.length >= question.maxSelections) {
       await ctx.answerCbQuery(`Максимум ${question.maxSelections} вариант(а)`);
       return;
     }
 
-    // Отвечаем на callback ПЕРВЫМ — ускоряет отклик кнопки
     await ctx.answerCbQuery().catch(() => {});
 
     const nextSelected = exists
@@ -698,7 +709,6 @@ class Handlers {
     const analysisResult = this.verseAnalysis.analyze(answers);
     ctx.session.analysisResult = analysisResult;
 
-    // ── Передаём лид в leadTransfer → Google Sheets + уведомления ──
     try {
       if (this.leadTransfer?.processLead) {
         await this.leadTransfer.processLead({
