@@ -175,7 +175,6 @@ class FileHandler {
 
   searchInAdminSystem(userId) {
     try {
-      // Поиск в системе уведомлений админа (если доступна)
       if (global.bot?.adminIntegration?.adminNotifications?.leadDataStorage) {
         const leadStorage = global.bot.adminIntegration.adminNotifications.leadDataStorage;
         
@@ -200,12 +199,9 @@ class FileHandler {
   }
 
   tryRecoverFromContext(ctx) {
-    // Пытаемся найти подсказки в тексте сообщения или других данных
-    // Это базовая эвристика для восстановления
     try {
       const messageText = ctx.callbackQuery?.message?.text || '';
       
-      // Если в сообщении есть упоминания о детях
       if (messageText.includes('ребенок') || messageText.includes('детск')) {
         return {
           analysis: { analysisType: 'child', segment: 'COLD_LEAD', primaryIssue: 'general_wellness' },
@@ -213,7 +209,6 @@ class FileHandler {
         };
       }
       
-      // Если есть упоминания о стрессе
       if (messageText.includes('стресс') || messageText.includes('тревог')) {
         return {
           analysis: { analysisType: 'adult', segment: 'WARM_LEAD', primaryIssue: 'chronic_stress' },
@@ -238,40 +233,32 @@ class FileHandler {
 
     console.log('📋 Данные для персонализации:', { isChildFlow, segment, primaryIssue });
 
-    // Увеличиваем статистику по сегментам
     if (this.bonusStats.bySegment[segment] !== undefined) {
       this.bonusStats.bySegment[segment]++;
     }
 
     let message = `🤔 *ПЕРСОНАЛЬНАЯ РЕКОМЕНДАЦИЯ*\n\n`;
     
-    // Генерируем рекомендацию на основе сегмента
     const recommendation = this.generateRecommendationBySegment(segment, isChildFlow, primaryIssue);
     message += recommendation.text;
     
-    // Добавляем информацию о проблеме
     if (primaryIssue) {
       const problemName = this.translateIssue(primaryIssue);
       message += `🎯 *Ваша основная проблема:* ${problemName}\n\n`;
     }
     
-    // Особенности для детей
     if (isChildFlow) {
       message += this.getChildSpecificAdvice(segment);
     }
     
-    // Анализ готовности (если есть данные)
     const readinessInfo = this.analyzeUserReadiness(surveyData);
     if (readinessInfo) {
       message += readinessInfo;
     }
     
     message += `⚠️ *ВАЖНО:* Используйте только проверенные программы с поддержкой!\n\n`;
-    
-    // Призыв к действию
     message += recommendation.cta;
 
-    // Генерируем клавиатуру
     const keyboard = this.generatePersonalizedKeyboard(segment, isChildFlow, recommendation.priority);
     
     await this.safeEditOrReply(ctx, message, keyboard);
@@ -331,13 +318,11 @@ class FileHandler {
     
     let readinessText = '';
     
-    // Анализ времени
     if (surveyData.time_commitment) {
       const timeInfo = this.translateTimeCommitment(surveyData.time_commitment);
       readinessText += `⏰ *Ваше время:* ${timeInfo}\n`;
     }
     
-    // Анализ опыта
     if (surveyData.breathing_experience) {
       const expInfo = this.translateExperience(surveyData.breathing_experience);
       readinessText += `🧘 *Ваш опыт:* ${expInfo}\n`;
@@ -392,7 +377,7 @@ class FileHandler {
     try {
       const message = `🚨 *ТЕХНИЧЕСКАЯ ПРОБЛЕМА*\n\n` +
         `Не удается загрузить систему персональных рекомендаций.\n\n` +
-        `💬 **Что делать:**\n` +
+        `💬 *Что делать:*\n` +
         `Напишите [Александру Попову](https://t.me/NastuPopova) - ` +
         `он лично поможет выбрать подходящую программу и ответит ` +
         `на все вопросы о дыхательных практиках!\n\n` +
@@ -413,7 +398,6 @@ class FileHandler {
       
     } catch (error) {
       console.error('❌ Даже экстренная помощь не сработала:', error);
-      // Самый простой ответ без разметки
       try {
         await ctx.reply('Техническая проблема. Напишите @NastuPopova для помощи в выборе программы.');
       } catch (finalError) {
@@ -504,7 +488,6 @@ class FileHandler {
     console.log('📝 safeEditOrReply: попытка отправки сообщения');
     
     try {
-      // Попытка 1: editMessageText
       await ctx.editMessageText(message, {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: keyboard }
@@ -514,7 +497,6 @@ class FileHandler {
       console.log('⚠️ Редактирование не удалось:', editError.message);
       
       try {
-        // Попытка 2: reply
         await ctx.reply(message, {
           parse_mode: 'Markdown',
           reply_markup: { inline_keyboard: keyboard }
@@ -524,7 +506,6 @@ class FileHandler {
         console.error('❌ Reply тоже не удался:', replyError.message);
         
         try {
-          // Попытка 3: без Markdown
           const cleanMessage = message.replace(/\*/g, '').replace(/_/g, '');
           await ctx.reply(cleanMessage, {
             reply_markup: { inline_keyboard: keyboard }
@@ -534,7 +515,6 @@ class FileHandler {
           console.error('❌ И без Markdown не работает:', cleanError.message);
           
           try {
-            // Попытка 4: только текст без клавиатуры
             await ctx.reply('Для помощи в выборе программы напишите @NastuPopova');
             console.log('✅ Простое сообщение отправлено');
           } catch (finalError) {
@@ -547,101 +527,6 @@ class FileHandler {
 
   // ===== ОСТАЛЬНЫЕ МЕТОДЫ (сохраняем существующие) =====
   
-  getBonusForUser(analysisResult, surveyData) {
-    // Существующий код getBonusForUser
-  }
-
-  async sendPDFFile(ctx) {
-    // Существующий код sendPDFFile
-  }
-
-  async showMoreMaterials(ctx) {
-    // Существующий код showMoreMaterials
-  }
-
-  async showAllPrograms(ctx) {
-    // Существующий код showAllPrograms
-  }
-
-  async handleOrderStarter(ctx) {
-    // Существующий код handleOrderStarter
-  }
-
-  async handleOrderIndividual(ctx) {
-    // Существующий код handleOrderIndividual
-  }
-
-  async handleDownloadRequest(ctx, callbackData) {
-    // Существующий код handleDownloadRequest
-  }
-
-  async closeMenu(ctx) {
-    // Существующий код closeMenu
-  }
-
-  async deleteMenu(ctx) {
-    return await this.closeMenu(ctx);
-  }
-
-  // ===== СТАТИСТИКА И ОТЛАДКА =====
-  
-  getBonusStats() {
-    return {
-      ...this.bonusStats,
-      help_choose_program_reliability: {
-        total_calls: this.bonusStats.helpChooseProgramCalls,
-        success_rate: this.bonusStats.helpChooseProgramCalls > 0 
-          ? ((this.bonusStats.personalizedRecommendations + this.bonusStats.genericHelpShown) / this.bonusStats.helpChooseProgramCalls * 100).toFixed(2) + '%'
-          : '0%',
-        personalized_rate: this.bonusStats.helpChooseProgramCalls > 0
-          ? (this.bonusStats.personalizedRecommendations / this.bonusStats.helpChooseProgramCalls * 100).toFixed(2) + '%'
-          : '0%',
-        emergency_fallback_rate: this.bonusStats.helpChooseProgramCalls > 0
-          ? (this.bonusStats.emergencyFallbacks / this.bonusStats.helpChooseProgramCalls * 100).toFixed(2) + '%'
-          : '0%'
-      },
-      last_updated: new Date().toISOString()
-    };
-  }
-
-  getAdditionalMaterials() {
-    return this.additionalMaterials;
-  }
-
-  // Экспорт конфигурации
-  exportConfig() {
-    return {
-      name: 'FileHandler',
-      version: '3.0.0',
-      features: [
-        'reliable_help_choose_program',
-        'multiple_fallback_paths',
-        'data_recovery_attempts',
-        'personalized_recommendations',
-        'comprehensive_diagnostics',
-        'safe_message_delivery',
-        'detailed_statistics'
-      ],
-      help_choose_program_paths: [
-        'personalized_help_with_analysis',
-        'recovered_data_personalization',
-        'generic_help_fallback',
-        'emergency_help_fallback'
-      ],
-      reliability_features: [
-        'full_diagnostics',
-        'admin_system_data_recovery',
-        'context_based_recovery',
-        'multiple_send_attempts',
-        'graceful_degradation'
-      ],
-      statistics: this.getBonusStats(),
-      last_updated: new Date().toISOString()
-    };
-  }
-
-  // ===== СУЩЕСТВУЮЩИЕ МЕТОДЫ (СОХРАНЯЕМ ИЗ ОРИГИНАЛА) =====
-
   getBonusForUser(analysisResult, surveyData) {
     try {
       const technique = this.contentGenerator.getMasterTechnique(analysisResult, surveyData);
@@ -661,80 +546,73 @@ class FileHandler {
     }
   }
 
- async sendPDFFile(ctx, bonus) {
-  let filePath = null;
-  let pdfSent = false;
+  async sendPDFFile(ctx, bonus) {
+    let filePath = null;
+    let pdfSent = false;
 
-  try {
-    if (!bonus) {
-      console.error('❌ Bonus не передан в sendPDFFile');
-      await ctx.reply('Ошибка: бонус не найден. Напишите @NastuPopova');
-      return;
-    }
+    try {
+      if (!bonus) {
+        console.error('❌ Bonus не передан в sendPDFFile');
+        await ctx.reply('Ошибка: бонус не найден. Напишите @NastuPopova');
+        return;
+      }
 
-    // Статичные PDF (fallback)
-    if (bonus.type === 'static' && bonus.staticType) {
-      console.log(`Отправляем статичный PDF: ${bonus.staticType}`);
-      await ctx.answerCbQuery('Отправляю базовый гид...');
-      return await this.sendAdditionalPDF(ctx, bonus.staticType);
-    }
+      if (bonus.type === 'static' && bonus.staticType) {
+        console.log(`Отправляем статичный PDF: ${bonus.staticType}`);
+        await ctx.answerCbQuery('Отправляю базовый гид...');
+        return await this.sendAdditionalPDF(ctx, bonus.staticType);
+      }
 
-    console.log(`Генерация персонального гида для ${ctx.from.id}`);
+      console.log(`Генерация персонального гида для ${ctx.from.id}`);
 
-    // Генерация HTML
-    filePath = await this.contentGenerator.generatePersonalizedHTML(
-      ctx.from.id,
-      ctx.session?.analysisResult || {},
-      ctx.session?.answers || {}
-    );
+      filePath = await this.contentGenerator.generatePersonalizedHTML(
+        ctx.from.id,
+        ctx.session?.analysisResult || {},
+        ctx.session?.answers || {}
+      );
 
-    if (!filePath || !fs.existsSync(filePath)) {
-      throw new Error('HTML-файл не был создан');
-    }
+      if (!filePath || !fs.existsSync(filePath)) {
+        throw new Error('HTML-файл не был создан');
+      }
 
-    const isChildFlow = bonus.isChildFlow || false;
-    const technique = bonus.technique;
-    if (!technique) throw new Error('Техника не найдена в бонусе');
+      const isChildFlow = bonus.isChildFlow || false;
+      const technique = bonus.technique;
+      if (!technique) throw new Error('Техника не найдена в бонусе');
 
-    const caption = `Ваш ${isChildFlow ? 'детский' : 'персональный'} гид готов!\n\n` +
-      `*Техника:* ${technique.name}\n` +
-      `• Пошаговая инструкция\n` +
-      `• Научное обоснование\n` +
-      `• План на 3 дня\n` +
-      `• Ожидаемые результаты\n\n` +
-      `Откройте файл в браузере для лучшего отображения`;
+      const caption = `Ваш ${isChildFlow ? 'детский' : 'персональный'} гид готов!\n\n` +
+        `*Техника:* ${technique.name}\n` +
+        `• Пошаговая инструкция\n` +
+        `• Научное обоснование\n` +
+        `• План на 3 дня\n` +
+        `• Ожидаемые результаты\n\n` +
+        `Откройте файл в браузере для лучшего отображения`;
 
-    // ОТПРАВКА PDF — если дошли сюда, значит всё ок
-    await ctx.replyWithDocument(
-      { source: filePath, filename: bonus.fileName || `Дыхательный_гид_${ctx.from.id}.html` },
-      { caption, parse_mode: 'Markdown' }
-    );
+      await ctx.replyWithDocument(
+        { source: filePath, filename: bonus.fileName || `Дыхательный_гид_${ctx.from.id}.html` },
+        { caption, parse_mode: 'Markdown' }
+      );
 
-    pdfSent = true; // ← ФЛАГ УСПЕХА
+      pdfSent = true;
 
-    console.log('PDF успешно отправлен');
-    this.bonusStats.byDeliveryMethod.file++;
+      console.log('PDF успешно отправлен');
+      this.bonusStats.byDeliveryMethod.file++;
 
-    // Только после успешной отправки — показываем финальный CTA-блок
-    await this.showPostPDFMenu(ctx);
+      await this.showPostPDFMenu(ctx);
 
-    // Удаляем временный файл
-    this.cleanupTempFile(filePath);
-
-  } catch (error) {
-    console.error('Ошибка в sendPDFFile:', error);
-
-    // Удаляем файл, если он был создан
-    if (filePath && fs.existsSync(filePath)) {
       this.cleanupTempFile(filePath);
-    }
 
-    // Сообщение об ошибке ТОЛЬКО если PDF НЕ был отправлен
-    if (!pdfSent) {
-      await ctx.reply('Не удалось отправить гид. Напишите @NastuPopova — он пришлёт материалы лично');
+    } catch (error) {
+      console.error('Ошибка в sendPDFFile:', error);
+
+      if (filePath && fs.existsSync(filePath)) {
+        this.cleanupTempFile(filePath);
+      }
+
+      if (!pdfSent) {
+        await ctx.reply('Не удалось отправить гид. Напишите @NastuPopova — он пришлёт материалы лично');
+      }
     }
   }
-}
 
   async showMoreMaterials(ctx) {
     console.log(`🎁 Показываем меню материалов для пользователя ${ctx.from.id}`);
@@ -942,6 +820,7 @@ class FileHandler {
   // ===== ФИНАЛЬНЫЙ CTA-БЛОК ПОСЛЕ PDF =====
   // Показывается один раз — после получения PDF-гида.
   // Цель: перевести тёплого лида в первую оплату (пробное занятие 1 500 ₽).
+  // Кнопка — callback, бот перехватывает нажатие и запускает мини-диалог сбора телефона.
   async showPostPDFMenu(ctx) {
     const message =
       `🎯 *ХОТИТЕ ПОЧУВСТВОВАТЬ РЕЗУЛЬТАТ УЖЕ СЕГОДНЯ?*\n\n` +
@@ -955,9 +834,9 @@ class FileHandler {
       `Я сам астматик с 30-летним стажем.\n` +
       `Метод изменил мою жизнь — помогу и вам.`;
 
-    // Одна широкая кнопка на всю ширину
+    // callback_data: 'book_trial' — бот перехватывает и запрашивает телефон
     const keyboard = [
-      [Markup.button.url('👉  Записаться на пробное занятие  —  1 500 ₽', 'https://t.me/spokoinoe_dyhanie')]
+      [Markup.button.callback('👉  Записаться на пробное занятие  —  1 500 ₽', 'book_trial')]
     ];
 
     await ctx.reply(message, {
@@ -965,6 +844,69 @@ class FileHandler {
       disable_web_page_preview: true,
       ...Markup.inlineKeyboard(keyboard)
     });
+  }
+
+  // ===== ОБРАБОТЧИК ЗАПИСИ НА ПРОБНОЕ ЗАНЯТИЕ =====
+  // Вызывается из основного bot.js на callback_data: 'book_trial'
+  async handleBookTrial(ctx) {
+    console.log(`📅 book_trial: пользователь ${ctx.from?.id} нажал кнопку записи`);
+
+    // Сохраняем шаг воронки в сессии
+    if (ctx.session) {
+      ctx.session.awaitingTrialPhone = true;
+      ctx.session.trialUserInfo = {
+        telegram_id: ctx.from?.id,
+        username:    ctx.from?.username || '',
+        first_name:  ctx.from?.first_name || '',
+      };
+    }
+
+    await ctx.answerCbQuery('Отлично! Сейчас оформим запись 👇');
+
+    await ctx.reply(
+      `✅ Отлично! Осталось один шаг.\n\n` +
+      `📞 Напишите ваш номер телефона — я свяжусь с вами в течение 2 часов и согласуем удобное время:\n\n` +
+      `_Пример: +79001234567_`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  // Вызывается из bot.js при получении текстового сообщения, когда session.awaitingTrialPhone === true
+  async handleTrialPhoneInput(ctx, notifyAdmin) {
+    const phone = ctx.message?.text?.trim();
+    const userInfo = ctx.session?.trialUserInfo || {};
+
+    console.log(`📞 Получен телефон для пробного занятия: ${phone}, пользователь: ${userInfo.telegram_id}`);
+
+    // Сбрасываем флаг
+    if (ctx.session) ctx.session.awaitingTrialPhone = false;
+
+    // Отправляем уведомление в прокси → Google Sheets purchases + Telegram
+    try {
+      if (typeof notifyAdmin === 'function') {
+        await notifyAdmin({
+          name:     userInfo.first_name || 'Без имени',
+          phone:    phone,
+          telegram: userInfo.username ? `@${userInfo.username}` : String(userInfo.telegram_id),
+          product:  'Пробное занятие',
+          price:    1500,
+          source:   'bot_book_trial',
+          status:   'новая'
+        });
+      }
+      console.log('✅ Заявка на пробное занятие записана');
+    } catch (err) {
+      console.error('❌ Ошибка записи заявки:', err.message);
+    }
+
+    // Подтверждение пользователю
+    await ctx.reply(
+      `🎉 *Готово! Ваша заявка принята.*\n\n` +
+      `📞 Телефон: ${phone}\n\n` +
+      `Я свяжусь с вами в течение 2 часов и согласуем удобное время занятия.\n\n` +
+      `_Стоимость: 1 500 ₽ — оплата после согласования времени._`,
+      { parse_mode: 'Markdown' }
+    );
   }
 
   async closeMenu(ctx) {
@@ -989,6 +931,10 @@ class FileHandler {
         );
       }
     }
+  }
+
+  async deleteMenu(ctx) {
+    return await this.closeMenu(ctx);
   }
 
   sendFallbackTechnique(ctx, bonus) {
@@ -1020,6 +966,48 @@ class FileHandler {
       description: 'Базовая техника дыхания от стресса',
       technique: this.contentGenerator.masterTechniques.chronic_stress,
       target_segments: ['HOT_LEAD', 'WARM_LEAD', 'COLD_LEAD', 'NURTURE_LEAD']
+    };
+  }
+
+  getBonusStats() {
+    return {
+      ...this.bonusStats,
+      help_choose_program_reliability: {
+        total_calls: this.bonusStats.helpChooseProgramCalls,
+        success_rate: this.bonusStats.helpChooseProgramCalls > 0 
+          ? ((this.bonusStats.personalizedRecommendations + this.bonusStats.genericHelpShown) / this.bonusStats.helpChooseProgramCalls * 100).toFixed(2) + '%'
+          : '0%',
+        personalized_rate: this.bonusStats.helpChooseProgramCalls > 0
+          ? (this.bonusStats.personalizedRecommendations / this.bonusStats.helpChooseProgramCalls * 100).toFixed(2) + '%'
+          : '0%',
+        emergency_fallback_rate: this.bonusStats.helpChooseProgramCalls > 0
+          ? (this.bonusStats.emergencyFallbacks / this.bonusStats.helpChooseProgramCalls * 100).toFixed(2) + '%'
+          : '0%'
+      },
+      last_updated: new Date().toISOString()
+    };
+  }
+
+  getAdditionalMaterials() {
+    return this.additionalMaterials;
+  }
+
+  exportConfig() {
+    return {
+      name: 'FileHandler',
+      version: '3.1.0',
+      features: [
+        'reliable_help_choose_program',
+        'multiple_fallback_paths',
+        'data_recovery_attempts',
+        'personalized_recommendations',
+        'comprehensive_diagnostics',
+        'safe_message_delivery',
+        'detailed_statistics',
+        'book_trial_callback_flow'
+      ],
+      statistics: this.getBonusStats(),
+      last_updated: new Date().toISOString()
     };
   }
 
