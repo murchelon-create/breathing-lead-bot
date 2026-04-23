@@ -25,6 +25,7 @@ async function notifyAdmin(data) {
           phone:    data.phone    || '—',
           email:    data.email    || '',
         },
+        source: data.source || 'bot',
       }),
     });
     const json = await res.json().catch(() => ({}));
