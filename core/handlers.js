@@ -4,20 +4,49 @@
 const { Markup } = require('telegraf');
 const config = require('../config');
 
-// Уведомление админу через прямой вызов Telegram Bot API
+// Уведомление админу: Telegram + Google Sheets через прокси
 async function notifyAdmin(data) {
   const token   = process.env.BOT_TOKEN || process.env.LEAD_BOT_TOKEN;
   const adminId = process.env.ADMIN_CHAT_ID || process.env.ADMIN_ID;
-
-  if (!token || !adminId) {
-    console.error('❌ notifyAdmin: не заданы BOT_TOKEN или ADMIN_CHAT_ID');
-    return;
-  }
+  const proxyUrl = 'https://buteyko-api.bothost.tech/notify';
 
   const esc = s => String(s || '—')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+
+  // ── 1. Google Sheets через прокси ──────────────────────────────────────────
+  try {
+    const res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sheet:   'purchases',
+        date:    new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' }),
+        name:    data.name    || '—',
+        phone:   data.phone   || '—',
+        telegram: data.telegram || '—',
+        product: data.product || '—',
+        price:   data.price   || 0,
+        source:  data.source  || 'bot_book_trial',
+        status:  data.status  || 'новая',
+      })
+    });
+    const json = await res.json().catch(() => ({}));
+    if (json.ok === false) {
+      console.warn('⚠️ Прокси вернул ошибку:', JSON.stringify(json));
+    } else {
+      console.log('✅ Заявка записана в Google Sheets через прокси');
+    }
+  } catch (err) {
+    console.error('❌ notifyAdmin: ошибка отправки на прокси:', err.message);
+  }
+
+  // ── 2. Telegram-уведомление админу ─────────────────────────────────────────
+  if (!token || !adminId) {
+    console.error('❌ notifyAdmin: не заданы BOT_TOKEN или ADMIN_CHAT_ID');
+    return;
+  }
 
   const text =
     `📅 <b>Новая заявка — Пробное занятие</b>\n\n` +
@@ -28,19 +57,22 @@ async function notifyAdmin(data) {
     `🔖 <b>Источник:</b> ${esc(data.source)}\n` +
     `🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' })}`;
 
-  const res = await fetch(
-    `https://api.telegram.org/bot${token}/sendMessage`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: adminId, text, parse_mode: 'HTML' })
-    }
-  );
-
-  const json = await res.json();
-  if (!json.ok) throw new Error(`Telegram API error: ${json.description}`);
-  console.log('✅ Уведомление админу отправлено через Telegram API');
-  return json;
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${token}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: adminId, text, parse_mode: 'HTML' })
+      }
+    );
+    const json = await res.json();
+    if (!json.ok) throw new Error(`Telegram API error: ${json.description}`);
+    console.log('✅ Уведомление админу отправлено через Telegram API');
+    return json;
+  } catch (err) {
+    console.error('❌ notifyAdmin: ошибка Telegram:', err.message);
+  }
 }
 
 class Handlers {
@@ -165,7 +197,7 @@ class Handlers {
       return;
     }
 
-    // ── Запись на пробное занятие ──────────────────────────────────
+    // ── Запись на пробное занятие ──────────────────────────────────────────
     if (callbackData === 'book_trial') {
       console.log('📅 Нажата кнопка: Записаться на пробное занятие');
       await ctx.answerCbQuery();
@@ -177,7 +209,7 @@ class Handlers {
       }
       return;
     }
-    // ──────────────────────────────────────────────────────────────
+    // ──────────────────────────────────────────────────────────────────────
 
     if (callbackData === 'back_to_results') {
       await ctx.answerCbQuery();
