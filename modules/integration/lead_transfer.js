@@ -7,6 +7,11 @@ const { webcrypto } = require('crypto');
 // ─── Переводы сегментов ───────────────────────────────────────────────────────
 
 const SEGMENT_LABELS = {
+  // Сегменты бота (диагностический бот)
+  HOT_LEAD:  '🔥 Горячий — выраженные нарушения',
+  WARM_LEAD: '🌱 Тёплый — умеренные нарушения',
+  COLD_LEAD: '❄️ Холодный — лёгкие нарушения',
+  // Сегменты сайта (запасные)
   good:     'Без нарушений',
   mild:     'Лёгкие нарушения',
   moderate: 'Умеренные нарушения',
@@ -38,6 +43,8 @@ const VALUE_LABELS = {
   'concentration_issues': 'Проблемы с концентрацией',
   'back_pain':            'Боли в шее, плечах, спине',
   'digestion_issues':     'Проблемы с пищеварением',
+  'panic_attacks':        'Панические атаки',
+  'general_wellness':     'Общее самочувствие',
   'nose':     'В основном носом',
   'mouth':    'Часто дышу ртом',
   'mixed':    'Попеременно носом и ртом',
@@ -52,10 +59,14 @@ const VALUE_LABELS = {
   'mouth_breathing':    'Дышу ртом вместо носа',
   'no_change':          'Не замечаю изменений',
   'conscious_breathing':'Стараюсь дышать глубже',
-  'few_times':    'Пробовал(а) пару раз, не пошло',
-  'theory_only':  'Изучал(а) теорию, но не практиковал(а)',
-  'regularly':    'Практикую регулярно (несколько раз в неделю)',
-  'expert':       'Опытный практик (ежедневно)',
+  // Опыт практик (breathing_experience)
+  'never':       'Никогда не практиковал(а)',
+  'rarely':      'Редко практикую',
+  'sometimes':   'Иногда практикую',
+  'few_times':   'Пробовал(а) пару раз, не пошло',
+  'theory_only': 'Изучал(а) теорию, но не практиковал(а)',
+  'regularly':   'Практикую регулярно (несколько раз в неделю)',
+  'expert':      'Опытный практик (ежедневно)',
   '3-5_minutes':   '3–5 минут',
   '10-15_minutes': '10–15 минут',
   '20-30_minutes': '20–30 минут',
@@ -76,6 +87,7 @@ const VALUE_LABELS = {
   'improve_focus':      'Улучшить концентрацию внимания',
   'weight_management':  'Поддержать процесс похудения',
   'general_health':     'Общее оздоровление организма',
+  'reduce_stress':      'Снизить уровень стресса',
   'respiratory_diseases':   'Астма / бронхит / ХОБЛ',
   'cardiovascular_diseases':'Гипертония / аритмия',
   'diabetes':               'Диабет 1 или 2 типа',
@@ -92,6 +104,11 @@ const VALUE_LABELS = {
 function translateValue(val) {
   if (Array.isArray(val)) return val.map(v => VALUE_LABELS[v] || v).join(', ');
   if (typeof val === 'number') return String(val);
+  if (typeof val === 'object' && val !== null) {
+    // Если объект — пробуем взять осмысленное строковое поле, потом перевести
+    const str = val.description || val.id || val.primaryIssue || val.name || '';
+    return VALUE_LABELS[str] || str;
+  }
   return VALUE_LABELS[val] || val || '';
 }
 
@@ -108,7 +125,6 @@ function toSheetString(val) {
   if (typeof val === 'string') return val;
   if (typeof val === 'number' || typeof val === 'boolean') return String(val);
   if (typeof val === 'object') {
-    // Если объект — пробуем взять осмысленные строковые поля
     return val.description || val.id || val.primaryIssue || val.name || '';
   }
   return String(val);
@@ -210,7 +226,7 @@ async function appendLeadToSheet(userData) {
     sa.email  || ui.email  || '',                                           // Email
     SEGMENT_LABELS[ar.segment] || ar.segment || '',                         // Сегмент (на русском)
     String(ar.scores?.total ?? ar.score ?? ''),                             // Счёт
-    toSheetString(ar.primaryIssue || ar.profile),                           // Профиль — только строка
+    translateValue(ar.primaryIssue || ar.profile),                          // Профиль (переведённый)
     translateValue(sa.age_group),                                           // Возраст
     translateValue(sa.occupation),                                          // Деятельность
     formatScale(sa.stress_level),                                           // Стресс (05/10)
@@ -576,7 +592,7 @@ class LeadTransferSystem {
         leads_in_admin_panel: this.adminNotifications?.leadDataStorage
           ? Object.keys(this.adminNotifications.leadDataStorage).length : 0,
       },
-      version:      '2.7.2',
+      version:      '2.7.3',
       last_updated: new Date().toISOString(),
     };
   }
