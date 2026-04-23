@@ -258,7 +258,7 @@ class AdminNotificationSystem {
       const telegram = this.bot.bot?.telegram || this.bot.telegram;
       if (!telegram) throw new Error('Telegram API недоступен');
 
-      await telegram.sendMessage(this.adminId, message, { parse_mode: 'Markdown' });
+      await telegram.sendMessage(this.adminId, message);
       console.log(`✅ Уведомление о старте анкеты отправлено: userId=${userId}`);
     } catch (error) {
       console.error('❌ Ошибка уведомления о старте анкеты:', error.message);
