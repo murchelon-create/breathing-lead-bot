@@ -3,6 +3,31 @@
 
 const { Markup } = require('telegraf');
 const config = require('../config');
+const https = require('https');
+
+// Функция отправки заявки на прокси → Google Sheets purchases + Telegram-уведомление
+function notifyAdmin(data) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(data);
+    const options = {
+      hostname: 'buteyko-api.bothost.tech',
+      path: '/notify',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => resolve(body));
+    });
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
 
 class Handlers {
   constructor(botInstance) {
@@ -14,6 +39,7 @@ class Handlers {
     this.leadTransfer = botInstance.leadTransfer;
     this.pdfManager = botInstance.pdfManager;
     this.adminNotifications = botInstance.adminNotifications;
+    this.fileHandler = botInstance.fileHandler;
     
     this.validateDependencies();
   }
@@ -25,7 +51,8 @@ class Handlers {
       handleHelpChooseProgram: !!this.pdfManager?.handleHelpChooseProgram,
       showMoreMaterials: !!this.pdfManager?.showMoreMaterials,
       surveyQuestions: !!this.surveyQuestions,
-      verseAnalysis: !!this.verseAnalysis
+      verseAnalysis: !!this.verseAnalysis,
+      fileHandler: !!this.fileHandler
     };
     
     Object.entries(checks).forEach(([check, result]) => {
@@ -124,6 +151,20 @@ class Handlers {
       return;
     }
 
+    // ── Запись на пробное занятие ──────────────────────────────────
+    if (callbackData === 'book_trial') {
+      console.log('📅 Нажата кнопка: Записаться на пробное занятие');
+      await ctx.answerCbQuery();
+      try {
+        await this.fileHandler.handleBookTrial(ctx);
+      } catch (error) {
+        console.error('❌ Ошибка handleBookTrial:', error);
+        await ctx.reply('😔 Произошла ошибка. Напишите @NastuPopova напрямую.');
+      }
+      return;
+    }
+    // ──────────────────────────────────────────────────────────────
+
     if (callbackData === 'back_to_results') {
       await ctx.answerCbQuery();
       if (ctx.session?.analysisResult) {
@@ -196,6 +237,18 @@ class Handlers {
 
   setupTextHandlers() {
     this.telegramBot.on('text', async (ctx) => {
+      // ── Перехват телефона для записи на пробное занятие ──────────
+      if (ctx.session?.awaitingTrialPhone) {
+        try {
+          await this.fileHandler.handleTrialPhoneInput(ctx, notifyAdmin);
+        } catch (error) {
+          console.error('❌ Ошибка handleTrialPhoneInput:', error);
+          await ctx.reply('😔 Произошла ошибка при сохранении заявки. Напишите @NastuPopova напрямую.');
+        }
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────
+
       if (ctx.session?.currentQuestion) {
         await ctx.reply('Пожалуйста, используйте кнопки выше для ответа на вопрос.');
       } else {
