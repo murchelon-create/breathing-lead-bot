@@ -50,6 +50,9 @@ class Handlers {
     this.pdfManager = botInstance.pdfManager;
     this.adminNotifications = botInstance.adminNotifications;
     this.fileHandler = botInstance.fileHandler;
+
+    // Кэш вопросов — избегаем повторного обхода дерева при каждом ответе
+    this._questionCache = new Map();
     
     this.validateDependencies();
   }
@@ -434,6 +437,16 @@ class Handlers {
     await this.askQuestion(ctx, 'age_group');
   }
 
+  // Вспомогательный метод: получить вопрос из кэша или загрузить и закэшировать
+  _getQuestion(questionKey) {
+    let question = this._questionCache.get(questionKey);
+    if (!question) {
+      question = this.surveyQuestions.getQuestion(questionKey);
+      if (question) this._questionCache.set(questionKey, question);
+    }
+    return question;
+  }
+
   async askQuestion(ctx, questionKey) {
     const askStartedAt = Date.now();
     console.log(`📋 Задаём вопрос: ${questionKey}`);
@@ -445,7 +458,8 @@ class Handlers {
     }
 
     try {
-      const question = this.surveyQuestions.getQuestion(questionKey);
+      // КЭШИРУЕМ: избегаем повторного обхода дерева вопросов
+      const question = this._getQuestion(questionKey);
       
       if (!question) {
         console.error(`❌ Вопрос ${questionKey} не найден`);
@@ -453,7 +467,7 @@ class Handlers {
         return;
       }
 
-      console.log(`✅ Вопрос найден: ${question.text.substring(0, 50)}...`);
+      console.log(`✅ Вопрос найден${this._questionCache.has(questionKey) ? ' (из кэша)' : ''}: ${question.text.substring(0, 50)}...`);
 
       ctx.session.currentQuestion = questionKey;
       ctx.session.questionStartTime = Date.now();
@@ -531,7 +545,8 @@ class Handlers {
       return await this.handleNavBack(ctx);
     }
 
-    const question = this.surveyQuestions.getQuestion(currentQuestion);
+    // КЭШИРУЕМ: не обходим дерево заново для уже загруженного вопроса
+    let question = this._getQuestion(currentQuestion);
     
     if (!question) {
       console.error(`❌ Вопрос "${currentQuestion}" не найден в surveyQuestions`);
@@ -539,7 +554,7 @@ class Handlers {
       return;
     }
 
-    console.log(`✅ Вопрос найден, тип: ${question.type}`);
+    console.log(`✅ Вопрос найден${this._questionCache.has(currentQuestion) ? ' (из кэша)' : ''}, тип: ${question.type}`);
 
     if (question.type === 'multiple_choice') {
       console.log('🔀 Обработка как множественный выбор');
@@ -614,7 +629,8 @@ class Handlers {
 
     ctx.session.answers[currentQuestion] = nextSelected;
 
-    const refreshedQuestion = this.surveyQuestions.getQuestion(currentQuestion);
+    // КЭШИРУЕМ: берём вопрос из кэша вместо нового обхода дерева
+    const refreshedQuestion = this._getQuestion(currentQuestion) || question;
 
     const origRows = refreshedQuestion.keyboard.reply_markup.inline_keyboard;
     const updatedRows = origRows.map(row =>
