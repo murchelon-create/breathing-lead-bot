@@ -357,6 +357,17 @@ class Handlers {
     ctx.session.completedQuestions = [];
     ctx.session.startTime = Date.now();
 
+    // Уведомляем админа о старте анкеты (для всех пользователей включая админа)
+    if (this.adminNotifications?.notifySurveyStarted) {
+      this.adminNotifications.notifySurveyStarted({
+        userInfo: {
+          telegram_id: ctx.from?.id,
+          first_name: ctx.from?.first_name,
+          username: ctx.from?.username
+        }
+      }).catch(e => console.warn('⚠️ Ошибка уведомления о старте:', e.message));
+    }
+
     await this.askQuestion(ctx, 'age_group');
   }
 
