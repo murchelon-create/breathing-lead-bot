@@ -199,7 +199,7 @@ async function getGoogleAccessToken() {
 
 // ─── Запись в Google Sheets ───────────────────────────────────────────────────
 // Заголовки (строка 1):
-// Дата | Источник | Имя | Телефон | Email | Сегмент | Счёт | Профиль |
+// Дата | Источник | Имя | Telegram | Телефон | Email | Сегмент | Счёт | Профиль |
 // Возраст | Деятельность | Стресс | Сон | Тип дыхания | Опыт практик |
 // Проблемы | Главная проблема | Цели | Время | Форматы | Хр. заболевания
 
@@ -218,27 +218,33 @@ async function appendLeadToSheet(userData) {
 
   const now = new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' });
 
+  // Формируем Telegram-контакт: @username если есть, иначе ссылка по telegram_id
+  const telegram = ui.username
+    ? `@${ui.username.replace(/^@/, '')}`
+    : ui.telegram_id ? `tg://user?id=${ui.telegram_id}` : '';
+
   const row = [
-    now,                                                                    // Дата
-    userData.source || 'bot',                                               // Источник
-    ui.first_name || ui.username || '',                                     // Имя
-    sa.phone  || ui.phone  || '',                                           // Телефон
-    sa.email  || ui.email  || '',                                           // Email
-    SEGMENT_LABELS[ar.segment] || ar.segment || '',                         // Сегмент (на русском)
-    String(ar.scores?.total ?? ar.score ?? ''),                             // Счёт
-    translateValue(ar.primaryIssue || ar.profile),                          // Профиль (переведённый)
-    translateValue(sa.age_group),                                           // Возраст
-    translateValue(sa.occupation),                                          // Деятельность
-    formatScale(sa.stress_level),                                           // Стресс (05/10)
-    formatScale(sa.sleep_quality),                                          // Сон (05/10)
-    translateValue(sa.breathing_method),                                    // Тип дыхания
-    translateValue(sa.breathing_experience),                                // Опыт практик
-    translateValue(sa.current_problems),                                    // Проблемы
-    translateValue(sa.priority_problem),                                    // Главная проблема
-    translateValue(sa.main_goals),                                          // Цели
-    translateValue(sa.time_commitment),                                     // Время
-    translateValue(sa.format_preferences),                                  // Форматы
-    translateValue(sa.chronic_conditions),                                  // Хр. заболевания
+    now,                                                                    // A: Дата
+    userData.source || 'bot',                                               // B: Источник
+    ui.first_name || '',                                                    // C: Имя
+    telegram,                                                               // D: Telegram ← НОВОЕ
+    sa.phone  || ui.phone  || '',                                           // E: Телефон
+    sa.email  || ui.email  || '',                                           // F: Email
+    SEGMENT_LABELS[ar.segment] || ar.segment || '',                         // G: Сегмент (на русском)
+    String(ar.scores?.total ?? ar.score ?? ''),                             // H: Счёт
+    translateValue(ar.primaryIssue || ar.profile),                          // I: Профиль (переведённый)
+    translateValue(sa.age_group),                                           // J: Возраст
+    translateValue(sa.occupation),                                          // K: Деятельность
+    formatScale(sa.stress_level),                                           // L: Стресс (05/10)
+    formatScale(sa.sleep_quality),                                          // M: Сон (05/10)
+    translateValue(sa.breathing_method),                                    // N: Тип дыхания
+    translateValue(sa.breathing_experience),                                // O: Опыт практик
+    translateValue(sa.current_problems),                                    // P: Проблемы
+    translateValue(sa.priority_problem),                                    // Q: Главная проблема
+    translateValue(sa.main_goals),                                          // R: Цели
+    translateValue(sa.time_commitment),                                     // S: Время
+    translateValue(sa.format_preferences),                                  // T: Форматы
+    translateValue(sa.chronic_conditions),                                  // U: Хр. заболевания
   ];
 
   const url =
@@ -592,7 +598,7 @@ class LeadTransferSystem {
         leads_in_admin_panel: this.adminNotifications?.leadDataStorage
           ? Object.keys(this.adminNotifications.leadDataStorage).length : 0,
       },
-      version:      '2.7.3',
+      version:      '2.7.4',
       last_updated: new Date().toISOString(),
     };
   }
