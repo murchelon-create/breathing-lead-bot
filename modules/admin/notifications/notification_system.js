@@ -230,6 +230,42 @@ class AdminNotificationSystem {
   // ===== ОСНОВНЫЕ МЕТОДЫ УВЕДОМЛЕНИЙ =====
 
   /**
+   * Уведомляет администратора о том, что пользователь начал анкету диагностики.
+   * Работает для ВСЕХ пользователей, включая администратора.
+   * Не использует shouldSendNotification — намеренно, чтобы не блокировать по фильтру.
+   */
+  async notifySurveyStarted(userData) {
+    // Блокируем только если нет adminId, уведомления выключены или тихий режим
+    if (!this.adminId || !this.enableNotifications || this.silentMode) {
+      console.log('📵 notifySurveyStarted заблокировано (нет adminId, уведомления выкл. или тихий режим)');
+      return;
+    }
+
+    const userId = userData.userInfo?.telegram_id;
+    const firstName = userData.userInfo?.first_name || 'Неизвестен';
+    const username = userData.userInfo?.username ? `@${userData.userInfo.username}` : '—';
+    const now = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+    const isAdminMark = this.isAdmin(userId) ? ' \\(сам администратор\\)' : '';
+
+    const message =
+      `📋 *Пользователь начал анкету диагностики*${isAdminMark}\n\n` +
+      `👤 Имя: ${firstName}\n` +
+      `🆔 ID: \`${userId}\`\n` +
+      `✈️ Telegram: ${username}\n` +
+      `🕐 ${now}`;
+
+    try {
+      const telegram = this.bot.bot?.telegram || this.bot.telegram;
+      if (!telegram) throw new Error('Telegram API недоступен');
+
+      await telegram.sendMessage(this.adminId, message, { parse_mode: 'Markdown' });
+      console.log(`✅ Уведомление о старте анкеты отправлено: userId=${userId}`);
+    } catch (error) {
+      console.error('❌ Ошибка уведомления о старте анкеты:', error.message);
+    }
+  }
+
+  /**
    * Отправляет уведомление администратору о новом лиде
    */
   async notifyNewLead(userData) {
