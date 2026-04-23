@@ -847,7 +847,8 @@ class FileHandler {
   }
 
   // ===== ОБРАБОТЧИК ЗАПИСИ НА ПРОБНОЕ ЗАНЯТИЕ =====
-  // Вызывается из основного bot.js на callback_data: 'book_trial'
+  // Вызывается из handlers.js на callback_data: 'book_trial'
+  // ВАЖНО: ctx.answerCbQuery() уже вызван в handlers.js — здесь НЕ вызываем повторно
   async handleBookTrial(ctx) {
     console.log(`📅 book_trial: пользователь ${ctx.from?.id} нажал кнопку записи`);
 
@@ -861,17 +862,17 @@ class FileHandler {
       };
     }
 
-    await ctx.answerCbQuery('Отлично! Сейчас оформим запись 👇');
+    // ctx.answerCbQuery() уже вызван в handlers.js — НЕ дублируем здесь
 
     await ctx.reply(
-      `✅ Отлично! Осталось один шаг.\n\n` +
+      `✅ Отлично! Остался один шаг.\n\n` +
       `📞 Напишите ваш номер телефона — я свяжусь с вами в течение 2 часов и согласуем удобное время:\n\n` +
       `_Пример: +79001234567_`,
       { parse_mode: 'Markdown' }
     );
   }
 
-  // Вызывается из bot.js при получении текстового сообщения, когда session.awaitingTrialPhone === true
+  // Вызывается из handlers.js при получении текстового сообщения, когда session.awaitingTrialPhone === true
   async handleTrialPhoneInput(ctx, notifyAdmin) {
     const phone = ctx.message?.text?.trim();
     const userInfo = ctx.session?.trialUserInfo || {};
@@ -881,7 +882,7 @@ class FileHandler {
     // Сбрасываем флаг
     if (ctx.session) ctx.session.awaitingTrialPhone = false;
 
-    // Отправляем уведомление в прокси → Google Sheets purchases + Telegram
+    // Отправляем уведомление админу
     try {
       if (typeof notifyAdmin === 'function') {
         await notifyAdmin({
@@ -995,7 +996,7 @@ class FileHandler {
   exportConfig() {
     return {
       name: 'FileHandler',
-      version: '3.1.0',
+      version: '3.2.0',
       features: [
         'reliable_help_choose_program',
         'multiple_fallback_paths',
@@ -1004,7 +1005,8 @@ class FileHandler {
         'comprehensive_diagnostics',
         'safe_message_delivery',
         'detailed_statistics',
-        'book_trial_callback_flow'
+        'book_trial_callback_flow',
+        'no_duplicate_answerCbQuery'
       ],
       statistics: this.getBonusStats(),
       last_updated: new Date().toISOString()
