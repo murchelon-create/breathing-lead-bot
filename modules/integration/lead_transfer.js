@@ -323,7 +323,8 @@ class LeadTransferSystem {
     } catch (error) {
       console.error('❌ Критическая ошибка обработки лида:', error.message);
       console.log('💾 Сохраняем лид локально из-за ошибки передачи');
-      await this.saveToAdminNotifications(userData);
+      // FIX: убран повторный вызов saveToAdminNotifications — он уже был вызван
+      // в начале try-блока, повторный вызов создавал дублирующее уведомление
       await this.saveLeadLocally(userData);
       await this.logLeadError(userData, error);
     }
@@ -598,7 +599,7 @@ class LeadTransferSystem {
         leads_in_admin_panel: this.adminNotifications?.leadDataStorage
           ? Object.keys(this.adminNotifications.leadDataStorage).length : 0,
       },
-      version:      '2.7.4',
+      version:      '2.7.5',
       last_updated: new Date().toISOString(),
     };
   }
